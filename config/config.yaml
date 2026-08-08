@@ -1,0 +1,44 @@
+# EBT 2026 Project Configuration File
+
+project:
+  name: "EBT_Project_2026"
+  version: "1.0.0"
+  description: "AI Challenge 2026 - Video Retrieval, TRAKE & Q&A"
+
+paths:
+  raw_data_dir: "data/raw"
+  videos_dir: "data/raw/videos"
+  keyframes_dir: "data/raw/keyframes"
+  objects_dir: "data/raw/objects"
+  metadata_dir: "data/raw/metadata"
+  
+  processed_dir: "data/processed"
+  clip_features_file: "data/processed/clip_features.npy"
+  faiss_index_dir: "data/processed/faiss_index"
+  cache_dir: "data/processed/cache"
+  
+  outputs_dir: "outputs"
+
+models:
+  clip:
+    model_name: "ViT-B/32"
+    device: "cuda"  # fallback to 'cpu' if no GPU available
+  vqa:
+    model_name: "Salesforce/blip-vqa-base"
+    max_top_k_frames: 10
+  faster_rcnn:
+    confidence_threshold: 0.3
+
+faiss:
+  index_type: "IndexFlatIP"  # Inner product for normalized cosine similarity
+  dimension: 512
+  top_k: 100
+
+scoring:
+  weights:
+    clip: 0.70
+    object: 0.20
+    metadata: 0.10
+
+ranking:
+  budgets: [1, 5, 20, 50, 100]

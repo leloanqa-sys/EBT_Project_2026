@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project Data and Large Artifacts (DO NOT PUSH TO GIT)
+data/
+outputs/
+spreadsheet_data.csv
+*.index
+*.db
+*.npz
+

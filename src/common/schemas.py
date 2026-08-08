@@ -30,24 +30,30 @@ class ParsedQuery:
 @dataclass
 class CandidateFrame:
     """
-    Dữ liệu ứng viên khung hình trao đổi giữa Role A, B, C.
+    Role A Contract Output: Khung hình ứng viên trích xuất từ CLIP retrieval engine.
     """
-    video_id: str
-    frame_id: int
     faiss_id: int
+    video_id: str
+    frame_idx: int
+    pts_time: float = 0.0
+    fps: float = 0.0
     clip_score: float = 0.0
+
+@dataclass
+class RankedCandidate:
+    """
+    Role B Contract Output: Ứng viên sau khi tổng hợp điểm Object Detection & Metadata.
+    """
+    candidate: CandidateFrame
     obj_score: float = 0.0
     meta_score: float = 0.0
-    fusion_score: float = 0.0        # đổi tên theo góp ý thực dụng
-    # --- optional, Tầng 2, chưa triển khai — bật khi cần ---
-    ocr_text: Optional[str] = None
-    asr_transcript: Optional[str] = None
+    fusion_score: float = 0.0
 
 @dataclass
 class Answer:
     """Kết quả trả lời cho Q&A."""
     answer_text: str
-    confidence: Optional[float] = None   # sửa theo góp ý bug quan trọng nhất
+    confidence: Optional[float] = None
 
 @dataclass
 class SubmissionItem:
@@ -64,3 +70,4 @@ class SubmissionOutput:
     query_id: str
     query_type: QueryType
     items: List[SubmissionItem] = field(default_factory=list)
+

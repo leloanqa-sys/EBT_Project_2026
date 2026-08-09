@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EBT Vision Search - AI Challenge 2026</title>
+    <meta name="description" content="Hệ thống truy vết khoảnh khắc video sử dụng AI - AI Challenge 2026">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="glass-header">
+        <div class="logo">
+            <span class="glow-text">EBT Vision Search</span>
+        </div>
+        <nav class="nav-links">
+            <a href="index.html" class="active">Tìm kiếm</a>
+            <a href="algorithm.html">Thuật toán &amp; Cơ chế chấm</a>
+        </nav>
+        <div class="system-status">
+            <span class="status-dot online" id="status-dot"></span>
+            <span class="status-text" id="status-text">Đang kiểm tra...</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Search Section -->
+        <section class="hero-search">
+            <div class="search-container glass-panel">
+                <div class="query-types">
+                    <button class="type-btn query-type-btn active" data-type="KIS">KIS</button>
+                    <button class="type-btn query-type-btn" data-type="QA">Q&amp;A</button>
+                    <button class="type-btn query-type-btn" data-type="TRAKE">TRAKE</button>
+                </div>
+                
+                <div class="search-box">
+                    <input type="text" id="search-input" placeholder="Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ">
+                    <button id="search-btn" class="primary-btn">
+                        <span class="btn-text">Tìm kiếm</span>
+                        <div class="loader hidden"></div>
+                    </button>
+                </div>
+                
+                <div class="dataset-stats">
+                    Dữ liệu: <span class="mono">177,321</span> keyframes | <span class="mono">873</span> videos | 🌐 Bi-lingual (VIE/ENG) | CLIP ViT-B/32
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loading-state" class="loading-state" style="display:none;">
+            <div class="spinner"></div>
+            <p>Đang tìm kiếm...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-state" class="error-state" style="display:none;">
+            <p id="error-message" class="error-text"></p>
+            <button id="retry-btn" class="secondary-btn">Thử lại</button>
+        </div>
+
+        <!-- Results Section -->
+        <section class="results-section" id="results-container" style="display:none;">
+            <!-- Summary Bar -->
+            <div class="results-summary glass-panel" id="summary-bar"></div>
+            
+            <!-- Parsed Info -->
+            <div class="parsed-info glass-panel" id="parsed-info" style="display:none;"></div>
+            
+            <!-- Results Grid (dynamically populated by app.js) -->
+            <div class="results-grid" id="results-grid"></div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="glass-footer">
+        <p>EBT Project 2026 &mdash; AI Challenge | Powered by CLIP + Gemini + FAISS</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

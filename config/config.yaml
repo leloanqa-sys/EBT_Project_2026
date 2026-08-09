@@ -42,3 +42,11 @@ scoring:
 
 ranking:
   budgets: [1, 5, 20, 50, 100]
+
+role_c:
+  top_k_raw: 300
+  cluster_gap_threshold: 15
+  ranking_strategy: "diversify"
+  vqa_model: "gemini/gemini-1.5-flash"
+  low_confidence_threshold: 0.25
+

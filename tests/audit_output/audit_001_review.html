@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Interactive Visual Audit — audit_001</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 20px; padding-bottom: 80px; }
+        h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 15px; }
+        
+        /* Control Bar */
+        .control-bar { position: sticky; top: 10px; z-index: 100; background: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #38bdf8; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+        .shortcuts { display: flex; gap: 15px; font-size: 0.9em; }
+        .key { background: #334155; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #475569; }
+        
+        .stats { display: flex; gap: 20px; font-weight: bold; }
+        .stat-box { background: #0f172a; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155; }
+        
+        .btn-export { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .btn-export:hover { background: #0369a1; }
+        
+        .query-box { background: #1e293b; padding: 15px; border-radius: 8px; border-left: 4px solid #38bdf8; margin-bottom: 25px; }
+        
+        /* Grid Layout */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .card { background: #1e293b; border-radius: 10px; padding: 14px; border: 2px solid #334155; transition: all 0.2s; position: relative; }
+        .card.active { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+        .card.verdict-match { border-color: #22c55e; background: #064e3b22; }
+        .card.verdict-mismatch { border-color: #ef4444; background: #7f1d1d22; }
+        
+        /* Image Preview Box */
+        .img-container { width: 100%; height: 190px; background: #0f172a; border-radius: 6px; margin: 10px 0; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid #334155; }
+        .img-container img { width: 100%; height: 100%; object-fit: cover; }
+        .img-placeholder { color: #94a3b8; font-size: 0.82em; text-align: center; padding: 12px; line-height: 1.5; }
+        .img-placeholder code { background: #1e293b; color: #38bdf8; padding: 2px 5px; border-radius: 4px; }
+
+        /* Object Pills */
+        .obj-box { margin: 8px 0; display: flex; flex-wrap: wrap; gap: 5px; }
+        .obj-pill { background: #0369a1; color: #e0f2fe; padding: 2px 7px; border-radius: 10px; font-size: 0.75em; font-weight: 600; }
+
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; background: #0284c7; color: white; margin-bottom: 8px; }
+        .verdict-tag { float: right; font-weight: bold; font-size: 0.85em; }
+        .tag-match { color: #4ade80; }
+        .tag-mismatch { color: #f87171; }
+        
+        .card-header { font-weight: bold; color: #f1f5f9; margin-bottom: 4px; font-size: 1.05em; }
+        .meta { font-size: 0.85em; color: #94a3b8; }
+        .score { color: #4ade80; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Smart Visual Audit Tool (Visual Keyframe Preview + Object Tags)</h1>
+
+    <div class="control-bar">
+        <div class="shortcuts">
+            <span><span class="key">1</span> / <span class="key">Y</span> : Khớp (MATCH ✅)</span>
+            <span><span class="key">0</span> / <span class="key">N</span> : Sai (MISMATCH ❌)</span>
+            <span><span class="key">J</span> / <span class="key">K</span> : Thao tác Thẻ Kế/Trước</span>
+            <span><span class="key">Ctrl + S</span> : Xuất File Verdict</span>
+        </div>
+        <div class="stats">
+            <div class="stat-box">Đã Chấm: <span id="stat-count" style="color:#38bdf8">0/10</span></div>
+            <div class="stat-box">Độ Chính Xác: <span id="stat-acc" style="color:#4ade80">0.0%</span></div>
+            <button class="btn-export" onclick="exportVerdictCSV()">💾 Xuất CSV Verdict</button>
+        </div>
+    </div>
+
+    <div class="query-box">
+        <h3>Query ID: audit_001</h3>
+        <p><strong>Raw Query:</strong> một người nam đeo kính đang thuyết trình trong phòng họp</p>
+    </div>
+    
+    <div class="grid" id="card-grid">
+    
+        <div class="card active" data-index="0" data-video="L21_V006" data-frame="6660" data-score="0.14109142124652863">
+            <span class="badge">Rank #1</span>
+            <span class="verdict-tag" id="tag-0">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V006 — Frame 6660</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V006</code> | Keyframe <code>n=65</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Flower</span>
+                
+                    <span class="obj-pill">🏷️ Toy</span>
+                
+                    <span class="obj-pill">🏷️ Car</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Fish</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 65</strong></p>
+                <p>FAISS ID: 1142</p>
+                <p>Score: <span class="score">0.1411</span></p>
+                <p>PTS Time: 222.00s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="1" data-video="L21_V006" data-frame="23412" data-score="0.14076361060142517">
+            <span class="badge">Rank #2</span>
+            <span class="verdict-tag" id="tag-1">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V006 — Frame 23412</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V006</code> | Keyframe <code>n=197</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Poster</span>
+                
+                    <span class="obj-pill">🏷️ Billboard</span>
+                
+                    <span class="obj-pill">🏷️ Scoreboard</span>
+                
+                    <span class="obj-pill">🏷️ Land vehicle</span>
+                
+                    <span class="obj-pill">🏷️ Computer monitor</span>
+                
+                    <span class="obj-pill">🏷️ Laptop</span>
+                
+                    <span class="obj-pill">🏷️ Television</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 197</strong></p>
+                <p>FAISS ID: 1274</p>
+                <p>Score: <span class="score">0.1408</span></p>
+                <p>PTS Time: 780.40s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="2" data-video="L21_V007" data-frame="4460" data-score="0.1435920149087906">
+            <span class="badge">Rank #3</span>
+            <span class="verdict-tag" id="tag-2">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V007 — Frame 4460</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V007</code> | Keyframe <code>n=39</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Human face</span>
+                
+                    <span class="obj-pill">🏷️ Woman</span>
+                
+                    <span class="obj-pill">🏷️ Girl</span>
+                
+                    <span class="obj-pill">🏷️ Boy</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 39</strong></p>
+                <p>FAISS ID: 1373</p>
+                <p>Score: <span class="score">0.1436</span></p>
+                <p>PTS Time: 148.67s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="3" data-video="L21_V009" data-frame="27498" data-score="0.14478814601898193">
+            <span class="badge">Rank #4</span>
+            <span class="verdict-tag" id="tag-3">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V009 — Frame 27498</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V009</code> | Keyframe <code>n=271</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Woman</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Building</span>
+                
+                    <span class="obj-pill">🏷️ Suit</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 271</strong></p>
+                <p>FAISS ID: 2131</p>
+                <p>Score: <span class="score">0.1448</span></p>
+                <p>PTS Time: 1099.92s (FPS: 25.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="4" data-video="L21_V010" data-frame="21877" data-score="0.14275427162647247">
+            <span class="badge">Rank #5</span>
+            <span class="verdict-tag" id="tag-4">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V010 — Frame 21877</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V010</code> | Keyframe <code>n=207</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Mobile phone</span>
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Human hand</span>
+                
+                    <span class="obj-pill">🏷️ Human arm</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Window</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 207</strong></p>
+                <p>FAISS ID: 2354</p>
+                <p>Score: <span class="score">0.1428</span></p>
+                <p>PTS Time: 875.08s (FPS: 25.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="5" data-video="L21_V010" data-frame="22050" data-score="0.14156568050384521">
+            <span class="badge">Rank #6</span>
+            <span class="verdict-tag" id="tag-5">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V010 — Frame 22050</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V010</code> | Keyframe <code>n=208</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Street light</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Lantern</span>
+                
+                    <span class="obj-pill">🏷️ Woman</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Building</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 208</strong></p>
+                <p>FAISS ID: 2355</p>
+                <p>Score: <span class="score">0.1416</span></p>
+                <p>PTS Time: 882.00s (FPS: 25.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="6" data-video="L21_V016" data-frame="27741" data-score="0.1608196496963501">
+            <span class="badge">Rank #7</span>
+            <span class="verdict-tag" id="tag-6">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V016 — Frame 27741</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V016</code> | Keyframe <code>n=232</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Tree</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Poster</span>
+                
+                    <span class="obj-pill">🏷️ Human head</span>
+                
+                    <span class="obj-pill">🏷️ Street light</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 232</strong></p>
+                <p>FAISS ID: 4011</p>
+                <p>Score: <span class="score">0.1608</span></p>
+                <p>PTS Time: 924.70s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="7" data-video="L21_V022" data-frame="6585" data-score="0.14183084666728973">
+            <span class="badge">Rank #8</span>
+            <span class="verdict-tag" id="tag-7">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V022 — Frame 6585</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V022</code> | Keyframe <code>n=53</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Poster</span>
+                
+                    <span class="obj-pill">🏷️ Traffic sign</span>
+                
+                    <span class="obj-pill">🏷️ Bird</span>
+                
+                    <span class="obj-pill">🏷️ Billboard</span>
+                
+                    <span class="obj-pill">🏷️ Flower</span>
+                
+                    <span class="obj-pill">🏷️ Tree</span>
+                
+                    <span class="obj-pill">🏷️ Toy</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 53</strong></p>
+                <p>FAISS ID: 5129</p>
+                <p>Score: <span class="score">0.1418</span></p>
+                <p>PTS Time: 219.53s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="8" data-video="L21_V023" data-frame="3494" data-score="0.1405124068260193">
+            <span class="badge">Rank #9</span>
+            <span class="verdict-tag" id="tag-8">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V023 — Frame 3494</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V023</code> | Keyframe <code>n=34</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Woman</span>
+                
+                    <span class="obj-pill">🏷️ Building</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Girl</span>
+                
+                    <span class="obj-pill">🏷️ Chair</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 34</strong></p>
+                <p>FAISS ID: 5341</p>
+                <p>Score: <span class="score">0.1405</span></p>
+                <p>PTS Time: 116.47s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+        <div class="card " data-index="9" data-video="L21_V028" data-frame="24369" data-score="0.14575114846229553">
+            <span class="badge">Rank #10</span>
+            <span class="verdict-tag" id="tag-9">⏳ Chờ chấm</span>
+            <div class="card-header">L21_V028 — Frame 24369</div>
+            
+            <!-- Keyframe Image Rendering -->
+            <div class="img-container">
+            
+                <div class="img-placeholder">
+                    ⚡ <strong>[Smart On-Demand Extractor Ready]</strong><br>
+                    Video: <code>L21_V028</code> | Keyframe <code>n=187</code><br>
+                    Cần thả file <code>keyframes_L21.zip</code> vào <code>data/zips/</code>
+                </div>
+            
+            </div>
+
+            <!-- Detected Object Pills -->
+            
+            <div class="obj-box">
+                
+                    <span class="obj-pill">🏷️ Person</span>
+                
+                    <span class="obj-pill">🏷️ Clothing</span>
+                
+                    <span class="obj-pill">🏷️ Man</span>
+                
+                    <span class="obj-pill">🏷️ Suit</span>
+                
+                    <span class="obj-pill">🏷️ Human face</span>
+                
+                    <span class="obj-pill">🏷️ Flag</span>
+                
+                    <span class="obj-pill">🏷️ Table</span>
+                
+            </div>
+            
+
+            <div class="meta">
+                <p>Mapped Keyframe: <strong>n = 187</strong></p>
+                <p>FAISS ID: 6922</p>
+                <p>Score: <span class="score">0.1458</span></p>
+                <p>PTS Time: 812.30s (FPS: 30.0)</p>
+            </div>
+        </div>
+    
+    </div>
+
+    <script>
+        let activeIndex = 0;
+        const totalCards = 10;
+        const verdicts = new Array(totalCards).fill(null);
+
+        function updateCardFocus() {
+            document.querySelectorAll('.card').forEach((card, idx) => {
+                if (idx === activeIndex) {
+                    card.classList.add('active');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    card.classList.remove('active');
+                }
+            });
+        }
+
+        function setVerdict(index, isMatch) {
+            verdicts[index] = isMatch;
+            const card = document.querySelector(`.card[data-index="${index}"]`);
+            const tag = document.getElementById(`tag-${index}`);
+
+            card.classList.remove('verdict-match', 'verdict-mismatch');
+            if (isMatch) {
+                card.classList.add('verdict-match');
+                tag.innerHTML = '✅ KHỚP (MATCH)';
+                tag.className = 'verdict-tag tag-match';
+            } else {
+                card.classList.add('verdict-mismatch');
+                tag.innerHTML = '❌ SAI (MISMATCH)';
+                tag.className = 'verdict-tag tag-mismatch';
+            }
+            updateStats();
+        }
+
+        function updateStats() {
+            const rated = verdicts.filter(v => v !== null).length;
+            const matches = verdicts.filter(v => v === true).length;
+            const acc = rated > 0 ? ((matches / rated) * 100).toFixed(1) : '0.0';
+            
+            document.getElementById('stat-count').innerText = `${rated}/${totalCards}`;
+            document.getElementById('stat-acc').innerText = `${acc}%`;
+        }
+
+        function exportVerdictCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,rank,video_id,frame_id,verdict,clip_score\n";
+            document.querySelectorAll('.card').forEach((card, idx) => {
+                const vid = card.getAttribute('data-video');
+                const frame = card.getAttribute('data-frame');
+                const score = card.getAttribute('data-score');
+                const v = verdicts[idx] === true ? "MATCH" : (verdicts[idx] === false ? "MISMATCH" : "UNRATED");
+                csvContent += `${idx + 1},${vid},${frame},${v},${score}\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `human_verdict_audit_001.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '1' || e.key.toLowerCase() === 'y') {
+                setVerdict(activeIndex, true);
+                if (activeIndex < totalCards - 1) activeIndex++;
+                updateCardFocus();
+            } else if (e.key === '0' || e.key.toLowerCase() === 'n') {
+                setVerdict(activeIndex, false);
+                if (activeIndex < totalCards - 1) activeIndex++;
+                updateCardFocus();
+            } else if (e.key.toLowerCase() === 'j' || e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                if (activeIndex < totalCards - 1) activeIndex++;
+                updateCardFocus();
+            } else if (e.key.toLowerCase() === 'k' || e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                if (activeIndex > 0) activeIndex--;
+                updateCardFocus();
+            } else if (e.ctrlKey && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                exportVerdictCSV();
+            }
+        });
+    </script>
+</body>
+</html>

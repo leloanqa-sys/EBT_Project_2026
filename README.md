@@ -2,6 +2,10 @@
 
 Hệ thống truy vết khoảnh khắc video (Textual KIS), truy vấn câu hỏi hình ảnh (Visual Q&A) và căn chỉnh sự kiện thời gian (TRAKE) cho cuộc thi AI Challenge 2026.
 
+> 📘 **Tài liệu Hướng dẫn Sử dụng & Vận hành:** Xem [USER_GUIDE.md](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/USER_GUIDE.md)  
+> 📐 **Tài liệu Kiến trúc & Bàn giao Kỹ thuật:** Xem [ARCHITECTURE_HANDOVER.md](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/ARCHITECTURE_HANDOVER.md)  
+> 📦 **Hồ sơ Đóng băng Bản V0 Baseline:** Xem [BASELINE_V0_RELEASE.md](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/BASELINE_V0_RELEASE.md)
+
 ---
 
 ## 🏗️ Cấu Trúc Dự Án (Project Architecture)

@@ -51,6 +51,8 @@ Bản V0 là **phiên bản khả dụng ổn định tuyệt đối (Determinis
 
 ## 2. Định Hướng Bản Thử Nghiệm V1 (Disciplined V1 Architecture)
 
+> 📘 **Đặc tả Toán học Chi tiết:** Tham khảo tài liệu [PROPOSED_V1_MATHEMATICAL_SPEC.md](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/PROPOSED_V1_MATHEMATICAL_SPEC.md) chứa 7 công thức toán học chi tiết.
+
 Để tránh hiện tượng **AI Stacking & False Consensus (Đồng thuận giả tạo)**, kiến trúc V1 thử nghiệm tuân thủ 5 nguyên tắc:
 
 1. **AI Scores là Evidence, không phải Truth:** Không tin tưởng tuyệt đối vào độ tự tin của AI; bắt buộc qua bước **Validation Calibration** trước khi xếp hạng.

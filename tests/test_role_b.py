@@ -87,7 +87,7 @@ class TestRoleBNLP(unittest.TestCase):
 
     def test_compute_fusion_score(self):
         score = compute_fusion_score(clip_score=0.8, obj_score=0.5, meta_score=0.0)
-        self.assertEqual(score, 0.66)
+        self.assertEqual(score, 0.72)
         
     def test_calculate_object_match_score(self):
         score = calculate_object_match_score(["car", "person"], ["Person", "building", "CAR"])

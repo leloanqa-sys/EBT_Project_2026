@@ -3,6 +3,8 @@ import json
 import hashlib
 import requests
 import re
+import time
+import threading
 from typing import List
 
 CACHE_DIR = os.path.join("data", "cache", "gemini_nlp")
@@ -125,13 +127,30 @@ def extract_target_objects_fallback(query_text: str) -> List[str]:
 
     return list(extracted)
 
+# Optimized model cascade according to user quota table (highest RPD & RPM first)
 GEMINI_MODEL_CASCADE = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-2.5-flash-lite",
-    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",   # 15 RPM / 500 RPD (Primary)
+    "gemini-3.1-flash-lite",   # 15 RPM / 500 RPD (Secondary)
+    "gemini-2.5-flash-lite",   # 10 RPM / 20 RPD
+    "gemini-3.6-flash",        # 5 RPM / 20 RPD
+    "gemini-3.5-flash",        # 5 RPM / 20 RPD
+    "gemini-2.5-flash",        # 5 RPM / 20 RPD
+    "gemini-2.0-flash",        # Backup
 ]
+
+_last_request_time = 0.0
+_request_lock = threading.Lock()
+
+def _enforce_rate_limit(min_gap: float = 0.25):
+    """Ensures at least min_gap seconds between API calls to prevent 429 rate limit locks."""
+    global _last_request_time
+    with _request_lock:
+        now = time.time()
+        elapsed = now - _last_request_time
+        if elapsed < min_gap:
+            time.sleep(min_gap - elapsed)
+        _last_request_time = time.time()
+
 
 def extract_target_objects(query_text: str) -> List[str]:
     """
@@ -164,8 +183,9 @@ def extract_target_objects(query_text: str) -> List[str]:
         "generationConfig": {"response_mime_type": "application/json"}
     }
 
-    # Model Fallback Cascade
+    # Model Fallback Cascade with Rate Limiting Guard
     for model_name in GEMINI_MODEL_CASCADE:
+        _enforce_rate_limit(0.25)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         try:
             resp = requests.post(url, json=payload, timeout=2.5)
@@ -216,6 +236,7 @@ def decompose_events(query_text: str) -> List[str]:
     }
 
     for model_name in GEMINI_MODEL_CASCADE:
+        _enforce_rate_limit(0.25)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         try:
             resp = requests.post(url, json=payload, timeout=2.5)

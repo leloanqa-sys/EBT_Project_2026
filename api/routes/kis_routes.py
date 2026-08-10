@@ -44,6 +44,8 @@ class ResultItem(BaseModel):
     timestamp: str = "00:00"
     frame_url: str
     detected_labels: List[str] = []
+    watch_url: Optional[str] = None
+    video_title: Optional[str] = None
 
 
 class ParsedInfo(BaseModel):
@@ -63,19 +65,35 @@ class SearchResponse(BaseModel):
     results: List[ResultItem]
 
 
+# ── Metadata cache helper for Tester Verification ──
+from functools import lru_cache
+import json
+
+@lru_cache(maxsize=1000)
+def get_video_metadata(video_id: str) -> dict:
+    meta_path = PROJECT_ROOT / "data" / "raw" / "media-info" / f"{video_id}.json"
+    if meta_path.exists():
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
 # ── Demo data for when VectorSearcher is not available ──
 
 DEMO_RESULTS = [
-    {"rank": 1, "video_id": "L25_V086", "frame_idx": 14550, "clip_score": 0.2469, "obj_score": 0.50, "fusion_score": 0.2728, "detected_labels": ["person", "clothing", "building"]},
-    {"rank": 2, "video_id": "L23_V025", "frame_idx": 11812, "clip_score": 0.2423, "obj_score": 0.33, "fusion_score": 0.2362, "detected_labels": ["person", "microphone"]},
-    {"rank": 3, "video_id": "L25_V004", "frame_idx": 25799, "clip_score": 0.2312, "obj_score": 0.50, "fusion_score": 0.2619, "detected_labels": ["person", "clothing", "tree"]},
-    {"rank": 4, "video_id": "L25_V072", "frame_idx": 21600, "clip_score": 0.2306, "obj_score": 0.00, "fusion_score": 0.1614, "detected_labels": ["person"]},
-    {"rank": 5, "video_id": "L25_V054", "frame_idx": 62250, "clip_score": 0.2200, "obj_score": 0.33, "fusion_score": 0.2206, "detected_labels": ["person", "car"]},
-    {"rank": 6, "video_id": "L22_V026", "frame_idx": 22862, "clip_score": 0.2171, "obj_score": 0.00, "fusion_score": 0.1520, "detected_labels": ["person", "building"]},
-    {"rank": 7, "video_id": "L25_V038", "frame_idx": 33450, "clip_score": 0.2191, "obj_score": 0.25, "fusion_score": 0.2034, "detected_labels": ["person", "tree", "bench"]},
-    {"rank": 8, "video_id": "L29_V005", "frame_idx": 12753, "clip_score": 0.2165, "obj_score": 0.00, "fusion_score": 0.1516, "detected_labels": ["person"]},
-    {"rank": 9, "video_id": "L25_V045", "frame_idx": 3000, "clip_score": 0.2170, "obj_score": 0.50, "fusion_score": 0.2519, "detected_labels": ["person", "clothing"]},
-    {"rank": 10, "video_id": "L24_V011", "frame_idx": 15872, "clip_score": 0.2135, "obj_score": 0.33, "fusion_score": 0.2161, "detected_labels": ["person", "table"]},
+    {"rank": 1, "video_id": "L25_V086", "frame_idx": 14550, "clip_score": 0.2469, "obj_score": 0.50, "fusion_score": 0.2728, "detected_labels": ["person", "clothing", "building"], "pts_time": 582.0},
+    {"rank": 2, "video_id": "L23_V025", "frame_idx": 11812, "clip_score": 0.2423, "obj_score": 0.33, "fusion_score": 0.2362, "detected_labels": ["person", "microphone"], "pts_time": 472.48},
+    {"rank": 3, "video_id": "L25_V004", "frame_idx": 25799, "clip_score": 0.2312, "obj_score": 0.50, "fusion_score": 0.2619, "detected_labels": ["person", "clothing", "tree"], "pts_time": 1031.96},
+    {"rank": 4, "video_id": "L25_V072", "frame_idx": 21600, "clip_score": 0.2306, "obj_score": 0.00, "fusion_score": 0.1614, "detected_labels": ["person"], "pts_time": 864.0},
+    {"rank": 5, "video_id": "L25_V054", "frame_idx": 62250, "clip_score": 0.2200, "obj_score": 0.33, "fusion_score": 0.2206, "detected_labels": ["person", "car"], "pts_time": 2490.0},
+    {"rank": 6, "video_id": "L22_V026", "frame_idx": 22862, "clip_score": 0.2171, "obj_score": 0.00, "fusion_score": 0.1520, "detected_labels": ["person", "building"], "pts_time": 914.48},
+    {"rank": 7, "video_id": "L25_V038", "frame_idx": 33450, "clip_score": 0.2191, "obj_score": 0.25, "fusion_score": 0.2034, "detected_labels": ["person", "tree", "bench"], "pts_time": 1338.0},
+    {"rank": 8, "video_id": "L29_V005", "frame_idx": 12753, "clip_score": 0.2165, "obj_score": 0.00, "fusion_score": 0.1516, "detected_labels": ["person"], "pts_time": 510.12},
+    {"rank": 9, "video_id": "L25_V045", "frame_idx": 3000, "clip_score": 0.2170, "obj_score": 0.50, "fusion_score": 0.2519, "detected_labels": ["person", "clothing"], "pts_time": 120.0},
+    {"rank": 10, "video_id": "L24_V011", "frame_idx": 15872, "clip_score": 0.2135, "obj_score": 0.33, "fusion_score": 0.2161, "detected_labels": ["person", "table"], "pts_time": 634.88},
 ]
 
 
@@ -88,9 +106,24 @@ def _run_demo_search(query: str, query_type: str, top_k: int) -> dict:
     """Return demo results when the real pipeline is unavailable."""
     results = []
     for item in DEMO_RESULTS[:top_k]:
+        pts = item.get("pts_time", 0.0)
+        minutes = int(pts // 60)
+        secs = int(pts % 60)
+        pts_str = f"{minutes:02d}:{secs:02d}"
+        
+        meta = get_video_metadata(item["video_id"])
+        watch_base = meta.get("watch_url", "")
+        v_title = meta.get("title", item["video_id"])
+        sec_int = int(pts)
+        watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
+
         results.append({
             **item,
+            "pts_time": round(pts, 2),
+            "timestamp": pts_str,
             "frame_url": _build_frame_url(item["video_id"], item["frame_idx"]),
+            "watch_url": watch_url,
+            "video_title": v_title,
         })
 
     return {
@@ -163,6 +196,12 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
         pts = c_obj.pts_time if c_obj else 0.0
         pts_str = f"{int(pts // 60):02d}:{int(pts % 60):02d}"
 
+        meta = get_video_metadata(item.video_id)
+        watch_base = meta.get("watch_url", "")
+        v_title = meta.get("title", item.video_id)
+        sec_int = int(pts)
+        watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
+
         detected = parse_json_to_detected_objects(item.video_id, item.frame_id)
         detected_labels = list(dict.fromkeys([obj.label for obj in detected]))  # deduplicate labels
 
@@ -182,6 +221,8 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
             "pts_time": round(pts, 2),
             "timestamp": pts_str,
             "frame_url": _build_frame_url(item.video_id, item.frame_id),
+            "watch_url": watch_url,
+            "video_title": v_title,
             "detected_labels": detected_labels[:8],  # top 8 labels for UI
         })
 

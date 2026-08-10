@@ -197,6 +197,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     `<span class="pill">${escapeHtml(label)}</span>`
                 ).join('');
 
+                const watchUrlHtml = result.watch_url ? 
+                    `<a href="${escapeHtml(result.watch_url)}" target="_blank" rel="noopener noreferrer" class="tester-verify-btn" title="Mở YouTube tại đúng phút:giây">
+                        🎬 Verify Video @ ⏱️ ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
+                     </a>` : 
+                    `<span class="tester-verify-btn disabled">
+                        ⏱️ ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
+                     </span>`;
+
+                const videoTitleHtml = result.video_title && result.video_title !== result.video_id ?
+                    `<div class="video-title" title="${escapeHtml(result.video_title)}">${escapeHtml(result.video_title)}</div>` : '';
+
                 card.innerHTML = `
                     <div class="card-image-container">
                         <span class="rank-badge ${rankClass}">#${result.rank}</span>
@@ -205,7 +216,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card-content">
                         <div class="card-header">
                             <h3 class="video-id">${escapeHtml(result.video_id)}</h3>
-                            <span class="frame-idx">⏱️ ${escapeHtml(result.timestamp || '00:00')} | Frame: ${result.frame_idx}</span>
+                            <span class="frame-idx">Frame #${result.frame_idx}</span>
+                        </div>
+                        ${videoTitleHtml}
+                        <div class="tester-verify-container">
+                            ${watchUrlHtml}
                         </div>
                         
                         <div class="scores-container">

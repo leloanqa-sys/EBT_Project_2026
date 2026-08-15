@@ -1,0 +1,69 @@
+import time
+import uuid
+from typing import List, Dict, Optional
+from src.common.schemas import CandidateFrame
+from src.pipeline import MVPPipeline, PipelineResult
+from src.role_c_logic.vqa_model import get_vqa_engine
+
+class QAPipeline:
+    def __init__(self, detect_threshold: float = 0.3):
+        self.kis_pipeline = MVPPipeline(detect_threshold=detect_threshold, top_k_retrieve=500)
+        self.vqa_engine = get_vqa_engine()
+        
+    def run(self, query_id: str, event_description: str, question: str, top_k: int = 5) -> Dict:
+        """
+        Runs the Q&A Pipeline:
+        1. Retrieve top-K frames based on event description.
+        2. Feed frames + question to VLM to get answer.
+        """
+        start_time = time.time()
+        
+        # 1. Retrieve candidates using existing KIS pipeline logic
+        kis_result = self.kis_pipeline.run(query_id, event_description, query_type="QA")
+        
+        # We only need the top candidate(s) to answer the question.
+        # NMS is already applied in executor. We take top_k.
+        candidates = kis_result.candidates[:top_k]
+        
+        if not candidates:
+            return {
+                "answer": "Không tìm thấy video/khung hình nào phù hợp với mô tả sự kiện.",
+                "evidence_candidates": []
+            }
+            
+        # Try to extract the best image to feed to VLM
+        best_candidate = candidates[0]
+        image_bytes = None
+        
+        try:
+            import sys
+            import os
+            PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            sys.path.insert(0, os.path.join(PROJECT_ROOT, "tools"))
+            
+            from tools.review_tool import resolve_keyframe_b64
+            import base64
+            
+            vid = best_candidate.video_id
+            fidx = best_candidate.frame_idx
+            
+            b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(vid, fidx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"))
+            if b64_str:
+                image_bytes = base64.b64decode(b64_str.split(",")[1])
+                        
+        except Exception as e:
+            print(f"[QA] Error extracting image for VLM: {e}")
+            
+        # 2. Get Answer from VLM
+        if image_bytes:
+            # We prepend the instruction to make it focus on QA
+            prompt = f"Dựa vào hình ảnh này, hãy trả lời câu hỏi ngắn gọn: {question}"
+            answer = self.vqa_engine.answer_question(image_bytes, prompt)
+        else:
+            answer = "Lỗi: Không trích xuất được hình ảnh để đưa vào VLM."
+            
+        return {
+            "answer": answer,
+            "evidence_candidates": candidates,
+            "latency_ms": (time.time() - start_time) * 1000
+        }

@@ -4,6 +4,14 @@ from itertools import groupby
 
 from src.common.schemas import CandidateFrame, SubmissionItem, SubmissionOutput, QueryType
 
+def compute_fusion_scores(candidates: List[CandidateFrame], w_clip: float = 1.0, w_obj: float = 0.5, w_spatial: float = 0.5):
+    """
+    Applies Soft Scoring to compute the final fusion_score for each candidate.
+    Weights can be tuned via ML Tuner.
+    """
+    for c in candidates:
+        c.fusion_score = (w_clip * c.clip_score) + (w_obj * c.obj_score) + (w_spatial * c.spatial_score)
+
 def _get_score(candidate: CandidateFrame) -> float:
     """Helper to safely retrieve score (fusion_score or clip_score)."""
     return getattr(candidate, 'fusion_score', candidate.clip_score)

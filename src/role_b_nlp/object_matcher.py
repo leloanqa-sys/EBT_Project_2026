@@ -3,7 +3,7 @@ import os
 import json
 import glob
 from dataclasses import dataclass
-from src.common.schemas import CandidateFrame, ParsedQuery
+from src.common.schemas import CandidateFrame, VisualIRGraph
 from src.role_b_nlp.fusion_score import compute_fusion_score
 
 @dataclass
@@ -96,7 +96,7 @@ def calculate_object_match_score(target_objects: List[str], detected_classes: Li
     matched = target_set.intersection(detected_set)
     return len(matched) / len(target_set)
 
-def fuse_candidates(candidates: List[CandidateFrame], parsed_query: ParsedQuery, objects_root: str = "data/raw/objects") -> List[CandidateFrame]:
+def fuse_candidates(candidates: List[CandidateFrame], parsed_query: Any, objects_root: str = "data/raw/objects") -> List[CandidateFrame]:
     """
     Thực hiện contract A-B-C: Tính điểm fusion score cho danh sách candidates.
     """

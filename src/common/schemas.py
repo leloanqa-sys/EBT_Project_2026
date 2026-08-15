@@ -15,22 +15,77 @@ class Query:
     query_type: QueryType = QueryType.KIS
     question_text: Optional[str] = None
 
-@dataclass
-class ParsedQuery:
+from pydantic import BaseModel, Field
+
+class Polarity(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+
+class Entity(BaseModel):
+    id: str
+    label: str
+
+class Attribute(BaseModel):
+    entity_id: str
+    name: str
+    value: Any
+    polarity: Polarity = Polarity.POSITIVE
+
+class Relation(BaseModel):
+    source_id: str
+    target_id: str
+    relation_type: str
+    surface_form: Optional[str] = None
+    polarity: Polarity = Polarity.POSITIVE
+
+class Event(BaseModel):
+    id: str
+    action: str
+    participants: List[str]
+    polarity: Polarity = Polarity.POSITIVE
+
+class TemporalConstraint(BaseModel):
+    source_id: str
+    target_id: str
+    relation: str
+
+class OrderConstraint(BaseModel):
+    target_id: str
+    axis: str
+    direction: str
+
+class SelectionConstraint(BaseModel):
+    target_id: str
+    rank: int
+
+class MetaInfo(BaseModel):
+    confidence: float = 1.0
+    ambiguous_notes: str = ""
+
+class VisualIRGraph(BaseModel):
     """
-    Role B Contract Output: Thực dụng, hỗ trợ trực tiếp TRAKE & QA mà không cần over-engineering.
+    Role B Contract Output: Visual Intermediate Representation.
+    Represents semantic intent of a query, independent of execution logic.
     """
-    normalized_text: str
-    query_type: QueryType
-    sub_events: List[str] = field(default_factory=list)      # chỉ có ở TRAKE
-    question_type: Optional[str] = None                       # chỉ có ở QA
-    qa_prompt: Optional[str] = None                            # chỉ có ở QA
-    attributes: Dict[str, Dict[str, Any]] = field(default_factory=dict)  # ép kiểu 2 tầng, đủ dùng
+    ir_version: str = "1.0"
+    query_id: str
+    raw_text: str
+    query_type: str
+    entities: List[Entity] = Field(default_factory=list)
+    attributes: List[Attribute] = Field(default_factory=list)
+    relations: List[Relation] = Field(default_factory=list)
+    events: List[Event] = Field(default_factory=list)
+    temporal_constraints: List[TemporalConstraint] = Field(default_factory=list)
+    order_constraints: List[OrderConstraint] = Field(default_factory=list)
+    selection_constraints: List[SelectionConstraint] = Field(default_factory=list)
+    meta: MetaInfo = Field(default_factory=MetaInfo)
+
 
 @dataclass
 class CandidateFrame:
     """
     Role A Contract Output: Khung hình ứng viên trích xuất từ CLIP retrieval engine.
+    Đã bổ sung các trường điểm số ML cho Soft Scoring (Machine Learning).
     """
     faiss_id: int
     video_id: str
@@ -38,6 +93,11 @@ class CandidateFrame:
     pts_time: float = 0.0
     fps: float = 0.0
     clip_score: float = 0.0
+    
+    # ML Soft Scoring Fields
+    obj_score: float = 0.0
+    spatial_score: float = 0.0
+    fusion_score: float = 0.0
 
 @dataclass
 class RankedCandidate:

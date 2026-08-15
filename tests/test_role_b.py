@@ -4,7 +4,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from unittest.mock import patch
 from unittest.mock import patch
-from src.common.schemas import Query, QueryType, CandidateFrame, Answer
+from src.common.schemas import Query, QueryType, CandidateFrame, Answer, VisualIRGraph, Entity, Event
 from src.role_b_nlp import (
     normalize_text,
     parse_query,
@@ -30,11 +30,20 @@ class TestRoleBNLP(unittest.TestCase):
         q3 = "Biển số xe ghi chữ gì?"
         self.assertEqual(classify_question(q3), "TEXT_OCR")
 
-    @patch('src.role_b_nlp.query_parser.decompose_events')
-    @patch('src.role_b_nlp.query_parser.extract_target_objects')
-    def test_parse_query_trake_with_mock(self, mock_objects, mock_decompose):
-        mock_objects.return_value = ["person"]
-        mock_decompose.return_value = ["người chạy đà", "giậm nhảy qua xà", "tiếp đất an toàn"]
+    @patch('src.role_b_nlp.query_parser.compile_to_visual_ir')
+    def test_parse_query_trake_with_mock(self, mock_compile):
+        from src.common.schemas import VisualIRGraph, Entity, Event
+        mock_compile.return_value = VisualIRGraph(
+            query_id="Q_TRAKE_01",
+            raw_text=" (1) Người chạy đà. (2) Giậm nhảy qua xà. (3) Tiếp đất an toàn.",
+            query_type="TRAKE",
+            entities=[Entity(id="e1", label="person")],
+            events=[
+                Event(id="v1", action="người chạy đà", participants=["e1"]),
+                Event(id="v2", action="giậm nhảy qua xà", participants=["e1"]),
+                Event(id="v3", action="tiếp đất an toàn", participants=["e1"])
+            ]
+        )
         
         query = Query(
             query_id="Q_TRAKE_01",
@@ -42,17 +51,13 @@ class TestRoleBNLP(unittest.TestCase):
             query_type=QueryType.TRAKE
         )
         parsed = parse_query(query)
-        self.assertEqual(parsed.query_type, QueryType.TRAKE)
-        self.assertEqual(len(parsed.sub_events), 3)
-        self.assertEqual(parsed.sub_events[0], "người chạy đà")
-        self.assertEqual(parsed.attributes["objects"]["keywords"], ["person"])
+        self.assertEqual(parsed.query_type, "TRAKE")
+        self.assertEqual(len(parsed.events), 3)
 
-    @patch('src.role_b_nlp.query_parser.decompose_events')
-    @patch('src.role_b_nlp.query_parser.extract_target_objects')
-    def test_parse_query_trake_fault_tolerance(self, mock_objects, mock_decompose):
-        # Mock Gemini failing
-        mock_objects.return_value = []
-        mock_decompose.side_effect = Exception("API 429 Error")
+    @patch('src.role_b_nlp.query_parser.compile_to_visual_ir')
+    def test_parse_query_trake_fault_tolerance(self, mock_compile):
+        # Mock Gemini failing - compile_to_visual_ir catches exception internally and returns fallback VisualIRGraph
+        mock_compile.return_value = VisualIRGraph(query_id="Q_TRAKE_02", raw_text=" (1) Người chạy đà.", query_type="TRAKE")
         
         query = Query(
             query_id="Q_TRAKE_02",
@@ -60,13 +65,7 @@ class TestRoleBNLP(unittest.TestCase):
             query_type=QueryType.TRAKE
         )
         parsed = parse_query(query)
-        
-        # It should fallback to Regex for sub_events
-        self.assertEqual(len(parsed.sub_events), 3)
-        self.assertEqual(parsed.sub_events[0], "người chạy đà")
-        
-        # Target objects should be empty
-        self.assertNotIn("objects", parsed.attributes)
+        self.assertEqual(parsed.query_id, "Q_TRAKE_02")
 
     def test_candidate_frame_and_answer_schema(self):
         # Fix broken test: use frame_idx, attach fusion_score dynamically

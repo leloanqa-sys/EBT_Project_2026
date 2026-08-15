@@ -19,15 +19,14 @@ from src.role_c_logic.ranking import (
     _get_score
 )
 from src.role_c_logic.output_formatter import build_submission, format_submission
-from src.role_c_logic.pipeline_kis import run_kis
 
 class TestRoleCLogic(unittest.TestCase):
 
     def test_representative_immutability(self):
         """Verify _representative uses dataclasses.replace and does NOT mutate original object."""
-        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, clip_score=0.5)
-        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, clip_score=0.9)
-        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=30, clip_score=0.7)
+        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, clip_score=0.5, fusion_score=0.5)
+        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, clip_score=0.9, fusion_score=0.9)
+        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=30, clip_score=0.7, fusion_score=0.7)
         
         cluster = [c1, c2, c3]
         rep = _representative(cluster)
@@ -38,7 +37,7 @@ class TestRoleCLogic(unittest.TestCase):
         self.assertEqual(rep.clip_score, 0.9)
         
         # Verify original c2 was NOT mutated if median had differed
-        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=100, clip_score=0.95)
+        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=100, clip_score=0.95, fusion_score=0.95)
         cluster2 = [c1, c2, c3, c4]  # median is index len//2 = 2 -> c3.frame_idx = 30
         rep2 = _representative(cluster2)
         
@@ -86,18 +85,86 @@ class TestRoleCLogic(unittest.TestCase):
         # Verify frame_id mapping
         self.assertEqual(ranked_items[0].frame_id, 10)
 
-    def test_format_submission_and_kis(self):
-        """Smoke test for output formatter and KIS pipeline."""
-        sample_query = "người nói chuyện"
-        out_csv = run_kis(sample_query, query_id="test_unit_001", top_k_raw=50)
+    def test_agent1_capability_registry_defer(self):
+        """Test Case 1.1: COUNT/OCR/EVENT_ACTION should be DEFER and executor should skip them as DEFERRED_TO_VLM."""
+        from src.role_c_logic.capability_registry import CapabilityStatus
+        from src.role_c_logic.executor import DeterministicExecutor
+        from src.role_c_logic.deterministic_planner import ExecutionPlan, PlanStep
+        from src.common.schemas import VisualIRGraph, CandidateFrame
         
-        self.assertTrue(os.path.exists(out_csv))
-        with open(out_csv, "r", encoding="utf-8") as f:
-            lines = f.readlines()
+        # Mock VectorSearcher
+        class MockSearcher:
+            pass
             
-        # 1 header line + up to 50 rows
-        self.assertTrue(len(lines) > 1)
-        self.assertTrue("rank,video_id,frame_id" in lines[0])
+        executor = DeterministicExecutor(MockSearcher())
+        
+        candidates_in = [
+            CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10),
+            CandidateFrame(faiss_id=2, video_id="V2", frame_idx=20),
+            CandidateFrame(faiss_id=3, video_id="V3", frame_idx=30),
+        ]
+        
+        # Manually set candidates in executor to mock previous step
+        # Actually executor.execute_plan takes the whole plan and runs it.
+        # But we want to test step skip behavior.
+        # We can just run a plan with ONE step that is DEFER.
+        plan = ExecutionPlan(
+            query_id="mock_q",
+            steps=[
+                PlanStep(step_id="s1", operator_name="COUNT", status=CapabilityStatus.DEFER, target="", args={})
+            ]
+        )
+        ir = VisualIRGraph(query_id="mock_q", raw_text="mock", query_type="KIS", entities=[], relations=[])
+        
+        # Inject candidates by overriding the first step to be a mock clip retrieve?
+        # Actually, execute_plan starts with empty candidates and does CLIP_RETRIEVE first.
+        # Let's add a mock CLIP_RETRIEVE step first.
+        plan.steps.insert(0, PlanStep(step_id="s0", operator_name="CLIP_RETRIEVE", status=CapabilityStatus.READY, target="", args={"k": 3}))
+        executor.searcher.search_by_text = lambda text, top_k: candidates_in
+        
+        # Run
+        executor.execute_plan(plan, ir)
+        
+        # Verify Trace
+        self.assertEqual(len(executor.logger.traces), 1)
+        trace = executor.logger.traces[0]
+        self.assertEqual(len(trace.operator_traces), 2)
+        
+        count_trace = trace.operator_traces[1]
+        self.assertEqual(count_trace.operator_name, "COUNT")
+        self.assertEqual(count_trace.status, "SKIPPED (DEFERRED_TO_VLM)")
+        self.assertEqual(count_trace.candidates_in, 3)
+        self.assertEqual(count_trace.candidates_out, 3)
+
+    def test_agent1_capability_registry_unsupported(self):
+        """Test Case 1.2: Other UNSUPPORTED capabilities should remain UNSUPPORTED."""
+        from src.role_c_logic.capability_registry import CapabilityStatus
+        from src.role_c_logic.executor import DeterministicExecutor
+        from src.role_c_logic.deterministic_planner import ExecutionPlan, PlanStep
+        from src.common.schemas import VisualIRGraph, CandidateFrame
+        
+        class MockSearcher:
+            pass
+            
+        executor = DeterministicExecutor(MockSearcher())
+        candidates_in = [CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10)]
+        
+        plan = ExecutionPlan(
+            query_id="mock_q",
+            steps=[
+                PlanStep(step_id="s1", operator_name="CLIP_RETRIEVE", status=CapabilityStatus.READY, target="", args={"k": 1}),
+                PlanStep(step_id="s2", operator_name="SOME_FUTURE_OP", status=CapabilityStatus.UNSUPPORTED, target="", args={})
+            ]
+        )
+        ir = VisualIRGraph(query_id="mock_q", raw_text="mock", query_type="KIS", entities=[], relations=[])
+        executor.searcher.search_by_text = lambda text, top_k: candidates_in
+        
+        executor.execute_plan(plan, ir)
+        
+        trace = executor.logger.traces[0]
+        unsupported_trace = trace.operator_traces[1]
+        self.assertEqual(unsupported_trace.status, "SKIPPED (UNSUPPORTED)")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -70,7 +70,7 @@ def audit_frame_with_gemini_vlm(
     frame_idx: int,
     image_path: Optional[str] = None,
     api_key: Optional[str] = None,
-    model: str = "models/gemini-2.0-flash"
+    model: str = "models/gemini-3.6-flash"
 ) -> Dict[str, Any]:
     """
     READ-ONLY Audit Function:

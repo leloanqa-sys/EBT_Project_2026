@@ -29,7 +29,7 @@ class SearchRequest(BaseModel):
     """Search request payload."""
     query: str = Field(..., min_length=1, description="Raw Vietnamese text query")
     query_type: str = Field(default="KIS", description="Query type: KIS, QA, TRAKE")
-    top_k: int = Field(default=20, ge=1, le=100, description="Number of results to return")
+    top_k: int = Field(default=100, ge=1, le=500, description="Number of results to return")
     question: Optional[str] = Field(default=None, description="Question text for QA type")
 
 
@@ -81,162 +81,133 @@ def get_video_metadata(video_id: str) -> dict:
     return {}
 
 
-# ── Demo data for when VectorSearcher is not available ──
+from fastapi.responses import FileResponse, Response
+import urllib.parse
+from pydantic import BaseModel, Field
 
-DEMO_RESULTS = [
-    {"rank": 1, "video_id": "L25_V086", "frame_idx": 14550, "clip_score": 0.2469, "obj_score": 0.50, "fusion_score": 0.2728, "detected_labels": ["person", "clothing", "building"], "pts_time": 582.0},
-    {"rank": 2, "video_id": "L23_V025", "frame_idx": 11812, "clip_score": 0.2423, "obj_score": 0.33, "fusion_score": 0.2362, "detected_labels": ["person", "microphone"], "pts_time": 472.48},
-    {"rank": 3, "video_id": "L25_V004", "frame_idx": 25799, "clip_score": 0.2312, "obj_score": 0.50, "fusion_score": 0.2619, "detected_labels": ["person", "clothing", "tree"], "pts_time": 1031.96},
-    {"rank": 4, "video_id": "L25_V072", "frame_idx": 21600, "clip_score": 0.2306, "obj_score": 0.00, "fusion_score": 0.1614, "detected_labels": ["person"], "pts_time": 864.0},
-    {"rank": 5, "video_id": "L25_V054", "frame_idx": 62250, "clip_score": 0.2200, "obj_score": 0.33, "fusion_score": 0.2206, "detected_labels": ["person", "car"], "pts_time": 2490.0},
-    {"rank": 6, "video_id": "L22_V026", "frame_idx": 22862, "clip_score": 0.2171, "obj_score": 0.00, "fusion_score": 0.1520, "detected_labels": ["person", "building"], "pts_time": 914.48},
-    {"rank": 7, "video_id": "L25_V038", "frame_idx": 33450, "clip_score": 0.2191, "obj_score": 0.25, "fusion_score": 0.2034, "detected_labels": ["person", "tree", "bench"], "pts_time": 1338.0},
-    {"rank": 8, "video_id": "L29_V005", "frame_idx": 12753, "clip_score": 0.2165, "obj_score": 0.00, "fusion_score": 0.1516, "detected_labels": ["person"], "pts_time": 510.12},
-    {"rank": 9, "video_id": "L25_V045", "frame_idx": 3000, "clip_score": 0.2170, "obj_score": 0.50, "fusion_score": 0.2519, "detected_labels": ["person", "clothing"], "pts_time": 120.0},
-    {"rank": 10, "video_id": "L24_V011", "frame_idx": 15872, "clip_score": 0.2135, "obj_score": 0.33, "fusion_score": 0.2161, "detected_labels": ["person", "table"], "pts_time": 634.88},
-]
-
-
-def _build_frame_url(video_id: str, frame_idx: int) -> str:
-    """Build the URL path for a keyframe image."""
-    return f"/keyframes/{video_id}/{frame_idx:04d}.jpg"
-
-
-def _run_demo_search(query: str, query_type: str, top_k: int) -> dict:
-    """Return demo results when the real pipeline is unavailable."""
-    results = []
-    for item in DEMO_RESULTS[:top_k]:
-        pts = item.get("pts_time", 0.0)
-        minutes = int(pts // 60)
-        secs = int(pts % 60)
-        pts_str = f"{minutes:02d}:{secs:02d}"
+# ── Dynamic Image Resolver Endpoint ──
+@router.get("/image/{video_id}/{frame_idx}")
+async def get_frame_image(video_id: str, frame_idx: int):
+    """
+    Resolve frame image dynamically from .zip or .mp4 files using tools logic.
+    """
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT / "tools"))
+        from tools.review_tool import resolve_keyframe_b64
+        import base64
         
-        meta = get_video_metadata(item["video_id"])
-        watch_base = meta.get("watch_url", "")
-        v_title = meta.get("title", item["video_id"])
-        sec_int = int(pts)
-        watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
+        b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(video_id, frame_idx, keyframes_root=str(PROJECT_ROOT / "data" / "raw" / "keyframes"))
+        
+        if b64_str:
+            # b64_str is like "data:image/jpeg;base64,....."
+            img_data = base64.b64decode(b64_str.split(",")[1])
+            mime_type = b64_str.split(";")[0].split(":")[1]
+            return Response(content=img_data, media_type=mime_type)
+            
+    except Exception as e:
+        print(f"[API] Image resolver error: {e}")
+        pass
+        
+    raise HTTPException(status_code=404, detail="Frame image not found")
 
-        results.append({
-            **item,
-            "pts_time": round(pts, 2),
-            "timestamp": pts_str,
-            "frame_url": _build_frame_url(item["video_id"], item["frame_idx"]),
-            "watch_url": watch_url,
-            "video_title": v_title,
-        })
-
-    return {
-        "query_id": f"demo_{uuid.uuid4().hex[:8]}",
-        "query": query,
-        "query_type": query_type,
-        "total_results": len(results),
-        "search_time_ms": 42.5,
-        "cache_hit": False,
-        "parsed_info": {
-            "normalized_text": query.lower(),
-            "extracted_objects": ["person", "clothing"],
-            "sub_events": [],
-        },
-        "results": results,
-    }
 
 
 def _run_real_search(query: str, query_type: str, top_k: int, question: Optional[str] = None) -> dict:
-    """Run the actual search pipeline."""
-    from src.common.schemas import Query, QueryType, CandidateFrame
-    from src.role_b_nlp.query_parser import parse_query
-    from src.role_b_nlp.object_matcher import fuse_candidates, parse_json_to_detected_objects
-    from src.role_c_logic.ranking import cluster_by_event, rank_5budget
-
-    # Import main module to get searcher singleton
+    """Run the actual search pipeline using MVPPipeline."""
+    from src.pipeline import MVPPipeline
+    import time
+    import uuid
     from api.main import _get_searcher
 
     start_time = time.perf_counter()
 
+    # We only use searcher check to ensure fail-fast, but MVPPipeline will load it anyway
     searcher = _get_searcher()
     if searcher is None:
         raise HTTPException(status_code=503, detail="VectorSearcher not loaded")
 
-    # Map query_type string to enum
-    qt_map = {"KIS": QueryType.KIS, "QA": QueryType.QA, "TRAKE": QueryType.TRAKE}
-    qt = qt_map.get(query_type.upper(), QueryType.KIS)
-
-    # Step 1: Retrieval — get raw candidates from FAISS
-    candidates = searcher.search_by_text(query, top_k=300)
-
-    # Step 2: NLP Parse
-    q_obj = Query(
-        query_id=f"api_{uuid.uuid4().hex[:8]}",
-        raw_text=query,
-        query_type=qt,
-        question_text=question,
-    )
-    parsed_q = parse_query(q_obj)
-
-    # Step 3: Fusion
-    candidates = fuse_candidates(candidates, parsed_q)
-
-    # Step 4: Clustering + Ranking
-    clustered = cluster_by_event(candidates, gap_threshold=15)
-    ranked_items = rank_5budget(clustered, strategy="diversify")
-
+    pipeline = MVPPipeline(detect_threshold=0.3, top_k_retrieve=500, searcher=searcher)
+    query_id = f"api_{uuid.uuid4().hex[:8]}"
+    
+    # Run pipeline
+    result = pipeline.run(query_id, query, query_type)
+    
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-    # Build candidate lookup map for fast retrieval
-    cand_map = {(c.video_id, c.frame_idx): c for c in candidates}
-
-    # Build response
+    # Build response format
     results = []
-    target_objs = parsed_q.attributes.get("objects", {}).get("keywords", [])
-
-    for item in ranked_items[:top_k]:
-        c_obj = cand_map.get((item.video_id, item.frame_id))
-        clip_sc = round(c_obj.clip_score, 4) if c_obj else 0.0
-        pts = c_obj.pts_time if c_obj else 0.0
+    
+    # Extract target objects from trace/ir
+    target_objs = []
+    if result.operator_trace and "ir_graph" in result.operator_trace:
+        ir = result.operator_trace["ir_graph"]
+        target_objs = [e.get("label", "") for e in ir.get("entities", [])]
+        
+    for c_obj in result.candidates:
+        if len(results) >= top_k:
+            break
+            
+        rank = len(results) + 1
+        pts = c_obj.pts_time
         pts_str = f"{int(pts // 60):02d}:{int(pts % 60):02d}"
 
-        meta = get_video_metadata(item.video_id)
+        meta = get_video_metadata(c_obj.video_id)
         watch_base = meta.get("watch_url", "")
-        v_title = meta.get("title", item.video_id)
+        v_title = meta.get("title", c_obj.video_id)
         sec_int = int(pts)
         watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
 
-        detected = parse_json_to_detected_objects(item.video_id, item.frame_id)
-        detected_labels = list(dict.fromkeys([obj.label for obj in detected]))  # deduplicate labels
+        # Fetch some labels from cache if available to show in UI
+        detected_labels = []
+        try:
+            from src.role_c_logic.executor import MetadataCache
+            db_meta = MetadataCache().get_metadata(c_obj.video_id, c_obj.frame_idx)
+            if db_meta:
+                detected_labels = list(dict.fromkeys([d["class_entity"] for d in db_meta]))[:8]
+        except Exception:
+            pass
 
-        if target_objs and detected_labels:
-            from src.role_b_nlp.object_matcher import calculate_object_match_score
-            obj_sc = round(calculate_object_match_score(target_objs, detected_labels), 4)
-        else:
-            obj_sc = 0.0
+        from src.role_b_nlp.object_matcher import calculate_object_match_score
+        obj_score = calculate_object_match_score(target_objs, detected_labels)
+        # Use the REAL fusion_score from the pipeline (includes Spatial & VQA logic)
+        fusion_score = c_obj.fusion_score
+        has_target_objects = len(target_objs) > 0
 
         results.append({
-            "rank": item.rank,
-            "video_id": item.video_id,
-            "frame_idx": item.frame_id,
-            "clip_score": clip_sc,
-            "obj_score": obj_sc,
-            "fusion_score": round(item.confidence_score, 4),
+            "rank": rank,
+            "video_id": c_obj.video_id,
+            "frame_idx": c_obj.frame_idx,
+            "clip_score": round(c_obj.clip_score, 4),
+            "obj_score": round(obj_score, 4),
+            "spatial_score": round(getattr(c_obj, 'spatial_score', 0.0), 4),
+            "fusion_score": round(fusion_score, 4),
+            "has_target_objects": has_target_objects,
             "pts_time": round(pts, 2),
             "timestamp": pts_str,
-            "frame_url": _build_frame_url(item.video_id, item.frame_id),
+            "frame_url": f"/api/v1/image/{c_obj.video_id}/{c_obj.frame_idx}",
             "watch_url": watch_url,
             "video_title": v_title,
-            "detected_labels": detected_labels[:8],  # top 8 labels for UI
+            "detected_labels": detected_labels,
         })
 
+    # Prepare extracted info for UI based on trace (we didn't pass the raw IR graph back in MVP result yet, so mock it for UI)
+    extracted_objects = []
+    if result.operator_trace and "operator_traces" in result.operator_trace:
+         for op in result.operator_trace["operator_traces"]:
+             if op["operator_name"] == "DETECT":
+                 extracted_objects.append(op.get("details", {}).get("class", ""))
+    
     return {
-        "query_id": q_obj.query_id,
+        "query_id": query_id,
         "query": query,
         "query_type": query_type,
         "total_results": len(results),
         "search_time_ms": round(elapsed_ms, 1),
         "cache_hit": False,
         "parsed_info": {
-            "normalized_text": parsed_q.normalized_text,
-            "extracted_objects": parsed_q.attributes.get("objects", {}).get("keywords", []),
-            "sub_events": parsed_q.sub_events,
+            "normalized_text": query.lower(),
+            "extracted_objects": [obj for obj in extracted_objects if obj],
+            "sub_events": [],
         },
         "results": results,
     }
@@ -259,13 +230,8 @@ async def search_kis(req: SearchRequest):
             question=req.question,
         )
     except Exception as e:
-        # Fallback to demo mode if pipeline is not available
-        print(f"[API] Pipeline error, falling back to DEMO mode: {e}")
-        result = _run_demo_search(
-            query=req.query,
-            query_type=req.query_type,
-            top_k=req.top_k,
-        )
+        print(f"[API] Pipeline error: {e}")
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
 
     return result
 

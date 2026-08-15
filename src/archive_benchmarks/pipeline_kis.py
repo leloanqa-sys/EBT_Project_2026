@@ -1,5 +1,5 @@
 from typing import List, Optional
-from src.common.schemas import CandidateFrame, QueryType, Query
+from src.common.schemas import VisualIRGraph, CandidateFrame, QueryType, Query
 from src.role_a_retrieval.searcher import VectorSearcher
 from src.role_b_nlp.query_parser import parse_query
 from src.role_b_nlp.object_matcher import fuse_candidates
@@ -18,6 +18,9 @@ def get_searcher() -> VectorSearcher:
         _SEARCHER_INSTANCE = VectorSearcher()
     return _SEARCHER_INSTANCE
 
+from src.role_c_logic.deterministic_planner import create_deterministic_plan
+from src.role_c_logic.executor import DeterministicExecutor
+
 def run_kis(
     raw_query: str,
     query_id: str,
@@ -26,24 +29,29 @@ def run_kis(
     strategy: str = "diversify"
 ) -> str:
     """
-    End-to-End Pipeline for Textual KIS (Known Item Search):
-    1. Retrieval: Fetch top_k_raw candidates from Role A FAISS engine.
-    2. Parse: Parse raw_query into ParsedQuery using Role B NLP Engine.
-    3. Fusion: Apply Role B score fusion with Object Detection Re-ranking.
-    4. Temporal Clustering: Group candidates by event window (gap_threshold) per video.
-    5. 5-Budget Ranking: Prioritize Rank 1, diversify video_ids at Ranks 2-5.
-    6. Formatting: Export submission CSV file to outputs/ directory.
+    M2 Pipeline:
+    1. Parse: NLP Engine -> VisualIRGraph
+    2. Plan: VisualIRGraph -> ExecutionPlan (DAG of capabilities)
+    3. Execute: DAG -> Filtered Candidates + Execution Trace
+    4. Rank & Format.
     """
     searcher = get_searcher()
-    candidates = searcher.search_by_text(raw_query, top_k=top_k_raw)
     
-    # Parse query using Role B
+    # 1. Parse Query
     q_obj = Query(query_id=query_id, query_type=QueryType.KIS, raw_text=raw_query)
-    parsed_q = parse_query(q_obj)
+    parsed_ir = parse_query(q_obj)
     
-    # Fusion
-    candidates = fuse_candidates(candidates, parsed_q)
+    # 2. Plan
+    plan = create_deterministic_plan(parsed_ir)
     
+    # 3. Execute
+    executor = DeterministicExecutor(searcher)
+    candidates = executor.execute_plan(plan, parsed_ir, top_k_raw=top_k_raw)
+    
+    # M0 Object Matcher Fusion fallback (if needed)
+    # candidates = fuse_candidates(candidates, parsed_ir) # Disabled since Executor handles logic now
+    
+    # 4. Temporal Clustering & Ranking
     clustered = cluster_by_event(candidates, gap_threshold=gap_threshold)
     ranked_items = rank_5budget(clustered, strategy=strategy)
     

@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const requestBody = {
             query: query,
             query_type: activeQueryType,
-            top_k: 20
+            top_k: 100
         };
 
         try {
@@ -221,6 +221,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${videoTitleHtml}
                         <div class="tester-verify-container">
                             ${watchUrlHtml}
+                        </div>
+                        
+                        <div class="feedback-actions" style="margin-top: 8px; display: flex; gap: 8px;">
+                            <button class="feedback-btn match-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 1, ${result.clip_score}, ${result.obj_score}, ${result.spatial_score}, ${result.has_target_objects}, this)" style="background: #28a745; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✅ Match</button>
+                            <button class="feedback-btn mismatch-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 0, ${result.clip_score}, ${result.obj_score}, ${result.spatial_score}, ${result.has_target_objects}, this)" style="background: #dc3545; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">❌ Mismatch</button>
                         </div>
                         
                         <div class="scores-container">

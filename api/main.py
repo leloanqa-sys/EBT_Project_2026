@@ -91,9 +91,15 @@ keyframes_dir = PROJECT_ROOT / "data" / "raw" / "keyframes"
 if keyframes_dir.exists():
     app.mount("/keyframes", StaticFiles(directory=str(keyframes_dir)), name="keyframes")
 
-# ── Import & include route modules ──
 from api.routes.kis_routes import router as kis_router
+from api.routes.qa_routes import router as qa_router
+from api.routes.trake_routes import router as trake_router
+from api.routes.feedback_routes import router as feedback_router
+
 app.include_router(kis_router, prefix="/api/v1")
+app.include_router(qa_router, prefix="/api/v1")
+app.include_router(trake_router, prefix="/api/v1")
+app.include_router(feedback_router, prefix="/api/v1")
 
 
 # ── Root redirect → UI ──

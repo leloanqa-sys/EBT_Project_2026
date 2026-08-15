@@ -86,8 +86,7 @@ class VectorSearcher:
                 self._text_model = (model, torch)
                 self._text_tokenizer = tokenizer
             except Exception as e:
-                print(f"[Warning] Unable to load open_clip model ({e}). Text encoder will fallback to mock/random for offline testing.")
-                self._text_model = "MOCK"
+                raise RuntimeError(f"Startup Fail-Fast: open_clip model loading failed ({e}). Please ensure open_clip and its dependencies are installed.")
 
     def encode_text_query(self, text_query: str) -> np.ndarray:
         """
@@ -103,17 +102,11 @@ class VectorSearcher:
 
         self._init_clip_text_encoder()
 
-        if self._text_model == "MOCK":
-            # Mock vector for offline environment testing if open_clip model downloading is unavailable
-            rng = np.random.RandomState(seed=abs(hash(norm_query)) % (2**32))
-            raw_vec = rng.randn(1, 512).astype(np.float32)
-            vector = l2_normalize(raw_vec)
-        else:
-            model, torch = self._text_model
-            text_tokens = self._text_tokenizer([norm_query])
-            with torch.no_grad():
-                text_features = model.encode_text(text_tokens)
-                vector = l2_normalize(text_features.cpu().numpy().astype(np.float32))
+        model, torch = self._text_model
+        text_tokens = self._text_tokenizer([norm_query])
+        with torch.no_grad():
+            text_features = model.encode_text(text_tokens)
+            vector = l2_normalize(text_features.cpu().numpy().astype(np.float32))
 
         np.save(cache_file, vector)
         return vector

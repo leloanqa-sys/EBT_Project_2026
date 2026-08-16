@@ -4,7 +4,7 @@ import hashlib
 import requests
 import time
 import threading
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 from src.common.schemas import (
     VisualIRGraph, Entity, Attribute, Relation, Event,

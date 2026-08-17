@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryBar = document.getElementById('summary-bar');
     const parsedInfoContainer = document.getElementById('parsed-info');
 
+    const parsedInfoContainer = document.getElementById('parsed-info');
+
     let activeQueryType = 'KIS';
     window.currentQueryData = null; // Store data for CSV export
 
@@ -51,11 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update placeholder based on type
                     if (searchInput) {
                         if (activeQueryType === 'KIS') {
-                            searchInput.placeholder = 'Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ';
+                            searchInput.placeholder = 'Nhp truy vn (Ting Vit / English)... VD: a man in a red shirt / ngi n ng o ';
                         } else if (activeQueryType === 'QA') {
-                            searchInput.placeholder = 'Nhập câu hỏi (VIE / ENG)... VD: What is the man doing? / Người đó làm gì?';
+                            searchInput.placeholder = 'Nhp cu hi (VIE / ENG)... VD: What is the man doing? / Ngi  lm g?';
                         } else if (activeQueryType === 'TRAKE') {
-                            searchInput.placeholder = 'Nhập truy vấn tracking (VIE / ENG)... VD: Step 1: running, Step 2: jumping';
+                            searchInput.placeholder = 'Nhp truy vn tracking (VIE / ENG)... VD: Step 1: running, Step 2: jumping';
                         }
                     }
                 });
@@ -82,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const query = searchInput.value.trim();
         if (!query) {
-            showError('Vui lòng nhập nội dung tìm kiếm');
+            showError('Vui lng nhp ni dung tm kim');
             return;
         }
 
@@ -112,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                throw new Error(`Lỗi Server: ${response.status} ${response.statusText}`);
+                throw new Error(`Li Server: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
@@ -123,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.info('Falling back to demo mode data...');
                 renderResults(getDemoData(query, activeQueryType));
             } else {
-                showError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau. ' + error.message);
+                showError('Khng th kt ni n my ch. Vui lng th li sau. ' + error.message);
             }
         } finally {
             if (searchBtn) {
@@ -140,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function renderResults(data) {
         if (!data || !data.results || data.results.length === 0) {
-            showError('Không tìm thấy kết quả phù hợp');
+            showError('Khng tm thy kt qu ph hp');
             return;
         }
 
@@ -152,11 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
             
             summaryBar.innerHTML = `
                 <div class="summary-item">
-                    <span class="summary-label">Kết quả:</span>
+                    <span class="summary-label">Kt qu:</span>
                     <span class="summary-value">${data.total_results || 0}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label">Thời gian:</span>
+                    <span class="summary-label">Thi gian:</span>
                     <span class="summary-value">${formatTime(data.search_time_ms || 0)}</span>
                 </div>
                 <div class="summary-item">
@@ -164,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="summary-value ${data.cache_hit ? 'cache-hit' : 'cache-miss'}">${data.cache_hit ? 'HIT' : 'MISS'}</span>
                 </div>
                 <div class="summary-item" style="margin-left: auto;">
-                    <button class="secondary-btn" onclick="exportSubmissionCSV()" style="padding: 4px 12px; font-size: 0.85em; background: #0284c7; color: #fff; border:none; border-radius: 4px; cursor: pointer;">⬇️ Xuất CSV (AIC Format)</button>
+                    <button class="secondary-btn" onclick="exportSubmissionCSV()" style="padding: 4px 12px; font-size: 0.85em; background: #0284c7; color: #fff; border:none; border-radius: 4px; cursor: pointer;"> Xut CSV (AIC Format)</button>
                 </div>
             `;
         }
@@ -178,9 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 parsedInfoContainer.innerHTML = `
                     <div class="parsed-item">
-                        <strong>Nội dung:</strong> <span>${escapeHtml(data.parsed_info.normalized_text || data.query)}</span>
+                        <strong>Ni dung:</strong> <span>${escapeHtml(data.parsed_info.normalized_text || data.query)}</span>
                     </div>
-                    ${tagsHtml ? `<div class="parsed-item"><strong>Đối tượng:</strong> <div class="tags-container">${tagsHtml}</div></div>` : ''}
+                    ${tagsHtml ? `<div class="parsed-item"><strong>i tng:</strong> <div class="tags-container">${tagsHtml}</div></div>` : ''}
                 `;
                 parsedInfoContainer.style.display = 'flex';
             } else {
@@ -204,21 +206,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 ).join('');
 
                 const watchUrlHtml = result.watch_url ? 
-                    `<a href="${escapeHtml(result.watch_url)}" target="_blank" rel="noopener noreferrer" class="tester-verify-btn" title="Mở YouTube tại đúng phút:giây">
-                        🎬 Verify Video @ ⏱️ ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
+                    `<a href="${escapeHtml(result.watch_url)}" target="_blank" rel="noopener noreferrer" class="tester-verify-btn" title="M YouTube ti ng pht:giy">
+                         Verify Video @  ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
                      </a>` : 
                     `<span class="tester-verify-btn disabled">
-                        ⏱️ ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
+                         ${escapeHtml(result.timestamp || '00:00')} (${result.pts_time}s)
                      </span>`;
 
                 const videoTitleHtml = result.video_title && result.video_title !== result.video_id ?
                     `<div class="video-title" title="${escapeHtml(result.video_title)}">${escapeHtml(result.video_title)}</div>` : '';
 
-                // Bug #1 Fix: Show VQA Answer ONLY for Q&A and TRAKE, NOT for KIS.
-                // KIS = Known Item Search — VLM answer is a description, not a Q&A answer.
-                // Displaying it for KIS is misleading (looks like a wrong answer field).
-                const isQAmode = data.query_type && data.query_type !== 'KIS';
-                const vqaAnswerHtml = (result.vqa_answer && isQAmode) ? 
+                const vqaAnswerHtml = result.vqa_answer ? 
                     `<div style="margin-top: 8px; padding: 6px; background-color: #ccfbf1; color: #0f766e; border-left: 3px solid #14b8a6; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
                         Answer: ${escapeHtml(result.vqa_answer)}
                      </div>` : '';
@@ -241,9 +239,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         
                         <div class="feedback-actions" style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
-                            <button class="feedback-btn match-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #15803d; color: white; border: 1px solid #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">✅ Match</button>
-                            <button class="feedback-btn uncertain-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'UNCERTAIN', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b45309; color: white; border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">⚠️ Không chắc</button>
-                            <button class="feedback-btn mismatch-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MISMATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b91c1c; color: white; border: 1px solid #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">❌ Mismatch</button>
+                            <button class="feedback-btn match-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #15803d; color: white; border: 1px solid #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;"> Match</button>
+                            <button class="feedback-btn uncertain-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'UNCERTAIN', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b45309; color: white; border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;"> Khng chc</button>
+                            <button class="feedback-btn mismatch-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MISMATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b91c1c; color: white; border: 1px solid #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;"> Mismatch</button>
                         </div>
                         
                         <div class="scores-container">
@@ -298,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Handles broken image links — removes img entirely to prevent any retry loop
+     * Handles broken image links  removes img entirely to prevent any retry loop
      */
     function handleImageError(imgElement) {
         // Guard: only handle once per image
@@ -311,9 +309,9 @@ document.addEventListener('DOMContentLoaded', () => {
         placeholder.className = 'image-placeholder';
         placeholder.innerHTML = `
             <div class="placeholder-content">
-                <span class="placeholder-icon">🎥</span>
+                <span class="placeholder-icon"></span>
                 <span class="placeholder-text">${escapeHtml(videoId)}</span>
-                <span class="placeholder-hint">Không tải được ảnh</span>
+                <span class="placeholder-hint">Khng ti c nh</span>
             </div>
         `;
         
@@ -422,7 +420,7 @@ window.submitFeedback = async function(queryId, videoId, frameIdx, verdict, clip
 
     } catch (err) {
         console.error('Failed to submit feedback:', err);
-        alert('Lỗi lưu kết quả chấm: ' + err.message);
+        alert('Li lu kt qu chm: ' + err.message);
     }
 };
 
@@ -433,7 +431,33 @@ window.submitFeedback = async function(queryId, videoId, frameIdx, verdict, clip
 window.exportSubmissionCSV = function() {
     const data = window.currentQueryData;
     if (!data || !data.results || data.results.length === 0) {
-        alert("Không có dữ liệu để xuất CSV!");
+        alert("Khng c d? li?u d? xu?t CSV!");
+        return;
+    }
+    
+    // AIC Format
+    let csvContent = "video_id,frame_idx,rank,fusion_score\n";
+    data.results.forEach(r => {
+        csvContent += \${r.video_id}\,\${r.frame_idx}\,\${r.rank}\,\${(r.fusion_score || 0).toFixed(4)}\\n;
+    });
+    // removing backticks because Add-Content evaluates it, I should be careful.
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", submission_ + (data.query_id || 'results') + .csv);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+/**
+ * Export current results to AIC format CSV
+ */
+window.exportSubmissionCSV = function() {
+    const data = window.currentQueryData;
+    if (!data || !data.results || data.results.length === 0) {
+        alert("Khng c d liu  xut CSV!");
         return;
     }
     

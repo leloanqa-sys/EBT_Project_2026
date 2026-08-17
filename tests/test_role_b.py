@@ -8,7 +8,6 @@ from src.common.schemas import Query, QueryType, CandidateFrame, Answer, VisualI
 from src.role_b_nlp import (
     normalize_text,
     parse_query,
-    classify_question,
     compute_fusion_score,
 )
 from src.role_b_nlp.object_matcher import calculate_object_match_score
@@ -19,16 +18,6 @@ class TestRoleBNLP(unittest.TestCase):
         raw = "  Người Chạy Ô Tô!!   "
         normalized = normalize_text(raw)
         self.assertEqual(normalized, "người chạy ô tô")
-
-    def test_classify_question(self):
-        q1 = "Trong video có bao nhiêu người?"
-        self.assertEqual(classify_question(q1), "COUNT")
-        
-        q2 = "Chiếc xe hơi màu gì?"
-        self.assertEqual(classify_question(q2), "COLOR")
-
-        q3 = "Biển số xe ghi chữ gì?"
-        self.assertEqual(classify_question(q3), "TEXT_OCR")
 
     @patch('src.role_b_nlp.query_parser.compile_to_visual_ir')
     def test_parse_query_trake_with_mock(self, mock_compile):

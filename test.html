@@ -1,4 +1,13 @@
-/**
+
+<!DOCTYPE html>
+<html>
+<body>
+    <div id="results-container">
+        <div id="summary-bar"></div>
+        <div id="parsed-info"></div>
+        <div id="results-grid"></div>
+    </div>
+    <script>/**
  * Main Application Logic for Video Retrieval AI System
  * EBT Project 2026
  */
@@ -214,11 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const videoTitleHtml = result.video_title && result.video_title !== result.video_id ?
                     `<div class="video-title" title="${escapeHtml(result.video_title)}">${escapeHtml(result.video_title)}</div>` : '';
 
-                // Bug #1 Fix: Show VQA Answer ONLY for Q&A and TRAKE, NOT for KIS.
-                // KIS = Known Item Search — VLM answer is a description, not a Q&A answer.
-                // Displaying it for KIS is misleading (looks like a wrong answer field).
-                const isQAmode = data.query_type && data.query_type !== 'KIS';
-                const vqaAnswerHtml = (result.vqa_answer && isQAmode) ? 
+                const vqaAnswerHtml = result.vqa_answer ? 
                     `<div style="margin-top: 8px; padding: 6px; background-color: #ccfbf1; color: #0f766e; border-left: 3px solid #14b8a6; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
                         Answer: ${escapeHtml(result.vqa_answer)}
                      </div>` : '';
@@ -459,3 +464,15 @@ window.exportSubmissionCSV = function() {
     link.click();
     document.body.removeChild(link);
 };
+</script>
+    <script>
+        const mock_data = {"query_id":"d6c8b022","query":"tim bai bien","query_type":"QA","total_results":20,"search_time_ms":4268,"cache_hit":false,"parsed_info":{"normalized_text":"tim bai bien","extracted_objects":[],"sub_events":[]},"results":[{"rank":1,"video_id":"L25_V032","frame_idx":1629,"clip_score":0.1458,"obj_score":0.0,"fusion_score":0.1458,"pts_time":65.16,"timestamp":"01:05","frame_url":"/api/v1/image/L25_V032/1629","detected_labels":[],"watch_url":"https://youtube.com/watch?v=hgH4k9QFoqY&t=65s","video_title":"title","vqa_answer":null}]};
+        try {
+            renderResults(mock_data);
+            console.log('SUCCESS');
+        } catch(e) {
+            console.log('ERROR:', e);
+        }
+    </script>
+</body>
+</html>

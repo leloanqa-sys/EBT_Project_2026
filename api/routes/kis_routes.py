@@ -46,6 +46,7 @@ class ResultItem(BaseModel):
     detected_labels: List[str] = []
     watch_url: Optional[str] = None
     video_title: Optional[str] = None
+    vqa_answer: Optional[str] = None
 
 
 class ParsedInfo(BaseModel):
@@ -87,7 +88,7 @@ from pydantic import BaseModel, Field
 
 # ── Dynamic Image Resolver Endpoint ──
 @router.get("/image/{video_id}/{frame_idx}")
-async def get_frame_image(video_id: str, frame_idx: int):
+def get_frame_image(video_id: str, frame_idx: int):
     """
     Resolve frame image dynamically from .zip or .mp4 files using tools logic.
     """
@@ -130,7 +131,7 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
     query_id = f"api_{uuid.uuid4().hex[:8]}"
     
     # Run pipeline
-    result = pipeline.run(query_id, query, query_type)
+    result = pipeline.run(query_id, query, query_type, question=question)
     
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
@@ -157,18 +158,19 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
         sec_int = int(pts)
         watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
 
-        # Fetch some labels from cache if available to show in UI
+        # Fetch labels from shared MetadataCache (reuse from executor, not new instance per request)
         detected_labels = []
         try:
-            from src.role_c_logic.executor import MetadataCache
-            db_meta = MetadataCache().get_metadata(c_obj.video_id, c_obj.frame_idx)
+            db_meta = pipeline._executor.meta_cache.get_metadata(c_obj.video_id, c_obj.frame_idx)
             if db_meta:
                 detected_labels = list(dict.fromkeys([d["class_entity"] for d in db_meta]))[:8]
         except Exception:
             pass
 
-        from src.role_b_nlp.object_matcher import calculate_object_match_score
-        obj_score = calculate_object_match_score(target_objs, detected_labels)
+        # Bug #2 Fix: DO NOT recalculate obj_score here.
+        # The pipeline executor already computed obj_score using the full synonyms_map + taxonomy_loader.
+        # Re-calculating with a simple string match would give inconsistent/wrong values.
+        obj_score = getattr(c_obj, 'obj_score', 0.0)
         # Use the REAL fusion_score from the pipeline (includes Spatial & VQA logic)
         fusion_score = c_obj.fusion_score
         has_target_objects = len(target_objs) > 0
@@ -188,6 +190,7 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
             "watch_url": watch_url,
             "video_title": v_title,
             "detected_labels": detected_labels,
+            "vqa_answer": getattr(c_obj, 'vqa_answer', None),
         })
 
     # Prepare extracted info for UI based on trace (we didn't pass the raw IR graph back in MVP result yet, so mock it for UI)
@@ -222,8 +225,10 @@ async def search_kis(req: SearchRequest):
     Accepts a Vietnamese text query and returns ranked video frames
     with explainability scores (CLIP, Object Detection, Fusion).
     """
+    from fastapi.concurrency import run_in_threadpool
     try:
-        result = _run_real_search(
+        result = await run_in_threadpool(
+            _run_real_search,
             query=req.query,
             query_type=req.query_type,
             top_k=req.top_k,

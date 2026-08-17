@@ -1,91 +1,224 @@
 import os
+import sys
 import glob
+import json
+import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 
-def load_human_verdicts(csv_dir="."):
-    """Loads all human_verdict_*.csv files."""
-    csv_files = glob.glob(os.path.join(csv_dir, "human_verdict_*.csv"))
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
+try:
+    from scipy.optimize import minimize
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+
+def load_human_verdicts(search_dirs=None):
+    """Loads all human_verdict_*.csv files across specified directories."""
+    if search_dirs is None:
+        search_dirs = [
+            os.path.join("outputs", "verdicts"),
+            os.path.join("data", "verdicts"),
+            "."
+        ]
+        
+    csv_files = []
+    for d in search_dirs:
+        if os.path.exists(d):
+            found = glob.glob(os.path.join(d, "human_verdict_*.csv"))
+            csv_files.extend(found)
+            
+    # Deduplicate files by basename
+    unique_files = {}
+    for f in csv_files:
+        bname = os.path.basename(f)
+        if bname not in unique_files:
+            unique_files[bname] = f
+            
+    csv_files = list(unique_files.values())
     if not csv_files:
-        print("❌ Không tìm thấy file human_verdict nào! Yêu cầu tester chấm bài trước qua review_tool.py")
+        print("❌ Không tìm thấy file human_verdict nào!")
+        print("👉 Hãy mở Web Review (tools/review_tool.py), chấm bài và lưu file CSV vào thư mục 'outputs/verdicts/'.")
         return pd.DataFrame()
         
     df_list = []
     for f in csv_files:
-        df = pd.read_csv(f)
-        # Extract query_id from filename: human_verdict_Q001.csv -> Q001
-        qid = os.path.basename(f).replace("human_verdict_", "").replace(".csv", "")
-        df["query_id"] = qid
-        df_list.append(df)
+        try:
+            df = pd.read_csv(f)
+            # Extract or ensure query_id
+            qid = os.path.basename(f).replace("human_verdict_", "").replace(".csv", "")
+            if "query_id" not in df.columns or df["query_id"].isnull().all():
+                df["query_id"] = qid
+            df_list.append(df)
+        except Exception as e:
+            print(f"⚠️ Không đọc được file {f}: {e}")
         
-    return pd.concat(df_list, ignore_index=True)
+    if not df_list:
+        return pd.DataFrame()
+        
+    combined = pd.concat(df_list, ignore_index=True)
+    print(f"📁 Đã nạp thành công {len(csv_files)} file CSV ({len(combined)} khung hình đã chấm).")
+    return combined
 
 def scoring_function(weights, df):
     """
-    Computes a synthetic fusion score using weights, then calculates how well
-    the MATCH items are ranked compared to MISMATCH items.
-    We want to MINIMIZE this function (so we return a negative score or penalty).
+    3-Tier Ranking Loss Function:
+    - MATCH items: Goal is Rank 0..4 (Penalty: 1.0 * rank)
+    - UNCERTAIN items: Goal is Middle Rank (Penalty: 0.5 * rank)
+    - MISMATCH items: Goal is Bottom (Penalty if ranked ahead of MATCH)
     """
     w_clip, w_obj, w_spatial = weights
     
-    # Calculate fusion_score
-    # Note: Currently the human_verdict.csv only saves clip_score. 
-    # To properly tune w_obj and w_spatial, the review_tool.py needs to export obj_score and spatial_score as well.
-    # We will assume they are present in the df for the future.
-    if 'obj_score' not in df.columns:
-        df['obj_score'] = 0.0
-    if 'spatial_score' not in df.columns:
-        df['spatial_score'] = 0.0
+    # Ensure numeric columns
+    for col in ['clip_score', 'obj_score', 'spatial_score']:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
         
-    df['fusion_score'] = (w_clip * df['clip_score']) + (w_obj * df['obj_score']) + (w_spatial * df['spatial_score'])
+    # Calculate synthetic fusion score
+    df['synthetic_fusion'] = (w_clip * df['clip_score']) + (w_obj * df['obj_score']) + (w_spatial * df['spatial_score'])
     
-    # Simple Loss Metric: Average rank of MATCH items (lower is better)
-    # We sort by fusion_score descending, and find the rank of MATCH items
     total_penalty = 0.0
     queries = df['query_id'].unique()
     
     for q in queries:
-        q_df = df[df['query_id'] == q].sort_values(by='fusion_score', ascending=False).reset_index()
-        # Find index of MATCH
-        match_indices = q_df.index[q_df['verdict'] == 'MATCH'].tolist()
-        if not match_indices:
-            continue
-            
-        # Penalty is the average rank of MATCH items
-        # Ideal rank is 0, 1, 2...
-        avg_rank = sum(match_indices) / len(match_indices)
-        total_penalty += avg_rank
+        q_df = df[df['query_id'] == q].sort_values(by='synthetic_fusion', ascending=False).reset_index(drop=True)
         
+        # 1. MATCH Loss
+        match_idx = q_df.index[q_df['verdict'] == 'MATCH'].tolist()
+        if match_idx:
+            # Average rank penalty for MATCH items (ideal rank is 0, 1, 2...)
+            match_rank_penalty = sum(match_idx) / len(match_idx)
+            total_penalty += 1.0 * match_rank_penalty
+            
+        # 2. UNCERTAIN Loss (Soft Penalty)
+        uncertain_idx = q_df.index[q_df['verdict'] == 'UNCERTAIN'].tolist()
+        if uncertain_idx:
+            uncertain_rank_penalty = sum(uncertain_idx) / len(uncertain_idx)
+            total_penalty += 0.5 * uncertain_rank_penalty
+            
+        # 3. Inversion Penalty: Count how many MISMATCH items are placed above any MATCH item
+        mismatch_idx = q_df.index[q_df['verdict'] == 'MISMATCH'].tolist()
+        if match_idx and mismatch_idx:
+            min_match_idx = min(match_idx)
+            # Count mismatches ahead of the best match
+            mismatches_above_match = sum(1 for m in mismatch_idx if m < min_match_idx)
+            total_penalty += 2.0 * mismatches_above_match
+            
     return total_penalty
 
-def run_ml_tuner():
-    print("🚀 Bắt đầu quá trình ML Tuning dựa trên Human Verdicts...")
+def optimize_weights_numpy(loss_fn, init_weights, df, bounds=(0.0, 4.0), step=0.2):
+    """
+    Fast, robust Coordinate Descent + Grid Search in pure NumPy (Zero extra dependencies).
+    """
+    best_weights = list(init_weights)
+    best_loss = loss_fn(best_weights, df)
+    
+    # 1. Coarse Grid Search
+    clip_vals = np.arange(bounds[0], bounds[1] + step, step)
+    obj_vals = np.arange(bounds[0], bounds[1] + step, step)
+    spatial_vals = np.arange(bounds[0], bounds[1] + step, step)
+    
+    for wc in clip_vals:
+        for wo in obj_vals:
+            for ws in spatial_vals:
+                if wc == 0 and wo == 0 and ws == 0:
+                    continue
+                loss = loss_fn([wc, wo, ws], df)
+                if loss < best_loss:
+                    best_loss = loss
+                    best_weights = [float(wc), float(wo), float(ws)]
+                    
+    # 2. Fine-grained Coordinate Descent around best point
+    fine_step = step / 4.0
+    improved = True
+    for _ in range(5):
+        if not improved:
+            break
+        improved = False
+        for i in range(3):
+            for delta in [-fine_step, fine_step]:
+                candidate = list(best_weights)
+                candidate[i] = max(bounds[0], min(bounds[1], candidate[i] + delta))
+                loss = loss_fn(candidate, df)
+                if loss < best_loss:
+                    best_loss = loss
+                    best_weights = candidate
+                    improved = True
+                    
+    return best_weights, best_loss
+
+def run_ml_tuner(output_json="outputs/tuning_results.json"):
+    print("=" * 60)
+    print("🤖 ML TUNER - TỐI ƯU HÓA TRỌNG SỐ FUSION DỰA TRÊN HUMAN VERDICTS")
+    print("=" * 60)
+    
     df = load_human_verdicts()
     if df.empty:
         return
         
-    # Initial weights: [w_clip, w_obj, w_spatial]
+    # Summary of verdicts
+    counts = df['verdict'].value_counts().to_dict()
+    print("📊 Thống kê Ground Truth hiện có:")
+    print(f"   - Khớp (MATCH)        : {counts.get('MATCH', 0)}")
+    print(f"   - Không chắc (UNCERTAIN): {counts.get('UNCERTAIN', 0)}")
+    print(f"   - Sai (MISMATCH)      : {counts.get('MISMATCH', 0)}")
+    print(f"   - Chưa chấm (UNRATED) : {counts.get('UNRATED', 0)}")
+    
+    # Baseline with current default weights: [1.0, 0.5, 0.5]
     init_weights = [1.0, 0.5, 0.5]
-    bounds = [(0.0, 5.0), (0.0, 5.0), (0.0, 5.0)] # Trọng số từ 0 đến 5
+    baseline_loss = scoring_function(init_weights, df.copy())
+    print(f"\n📉 Mức phạt trước tối ưu (Baseline Loss với [1.0, 0.5, 0.5]): {baseline_loss:.4f}")
     
-    print(f"Đang tối ưu hóa trên {len(df)} khung hình đã được chấm...")
+    bounds = (0.0, 4.0)
+    print("⏳ Đang tính toán tìm kiếm điểm trọng số tối ưu...")
     
-    res = minimize(
-        scoring_function, 
-        init_weights, 
-        args=(df,), 
-        method='L-BFGS-B', 
-        bounds=bounds
-    )
+    if HAS_SCIPY:
+        res = minimize(
+            scoring_function, 
+            init_weights, 
+            args=(df.copy(),), 
+            method='L-BFGS-B', 
+            bounds=[(bounds[0], bounds[1])] * 3
+        )
+        opt_w_clip, opt_w_obj, opt_w_spatial = res.x
+        opt_loss = res.fun
+    else:
+        best_w, opt_loss = optimize_weights_numpy(scoring_function, init_weights, df.copy(), bounds=bounds)
+        opt_w_clip, opt_w_obj, opt_w_spatial = best_w
     
-    print("\n✅ Tối ưu hóa hoàn tất!")
-    print(f"📉 Mức phạt thấp nhất đạt được (Loss): {res.fun:.4f}")
-    print("\n🎯 BỘ TRỌNG SỐ TỐI ƯU (Optimal Weights):")
-    print(f"  w_clip    = {res.x[0]:.4f}")
-    print(f"  w_obj     = {res.x[1]:.4f}")
-    print(f"  w_spatial = {res.x[2]:.4f}")
+    print("\n" + "=" * 60)
+    print("✅ TỐI ƯU HÓA HOÀN TẤT!")
+    print(f"📉 Mức phạt tối ưu đạt được (Optimal Loss): {opt_loss:.4f} (Giảm: {baseline_loss - opt_loss:.4f})")
+    print("\n🎯 BỘ TRỌNG SỐ ĐỀ XUẤT (Candidate Optimal Hyperparameters):")
+    print(f"   - w_clip    = {opt_w_clip:.4f}")
+    print(f"   - w_obj     = {opt_w_obj:.4f}")
+    print(f"   - w_spatial = {opt_w_spatial:.4f}")
+    print("=" * 60)
     
-    print("\n👉 Hãy cập nhật các trọng số này vào hàm compute_fusion_scores trong src/role_c_logic/ranking.py")
+    # Save results to JSON file for benchmarking / later use
+    os.makedirs(os.path.dirname(output_json), exist_ok=True)
+    results_payload = {
+        "baseline_loss": float(baseline_loss),
+        "optimal_loss": float(opt_loss),
+        "optimal_weights": {
+            "w_clip": round(float(opt_w_clip), 4),
+            "w_obj": round(float(opt_w_obj), 4),
+            "w_spatial": round(float(opt_w_spatial), 4)
+        },
+        "verdict_counts": {k: int(v) for k, v in counts.items()},
+        "total_evaluated_frames": len(df)
+    }
+    
+    with open(output_json, "w", encoding="utf-8") as f:
+        json.dump(results_payload, f, indent=2, ensure_ascii=False)
+        
+    print(f"💾 Đã lưu kết quả cấu hình tối ưu vào: {output_json}")
+    print("📌 Ghi chú: Trọng số trong ranking.py vẫn được giữ nguyên mặc định cho đến khi bạn hoàn tất chấm toàn bộ batch lớn.")
 
 if __name__ == "__main__":
     run_ml_tuner()

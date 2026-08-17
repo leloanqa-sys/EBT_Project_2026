@@ -74,7 +74,7 @@ class MVPPipeline:
             self._executor.detect_score_threshold = self.detect_threshold
             print(f"  [MVP] Ready. DETECT threshold = {self.detect_threshold}")
 
-    def run(self, query_id: str, raw_text: str, query_type: str = "KIS") -> PipelineResult:
+    def run(self, query_id: str, raw_text: str, query_type: str = "KIS", question: Optional[str] = None) -> PipelineResult:
         """
         Full pipeline for one query.
         Step 1: M1 - Parse NLP -> VisualIR (with Gemini API, cached)
@@ -94,40 +94,134 @@ class MVPPipeline:
         
         # === STEP 4: Soft Scoring & Ranking ===
         from src.role_c_logic.ranking import compute_fusion_scores
-        compute_fusion_scores(candidates)
+        compute_fusion_scores(candidates, ir_graph=ir_graph)
+        
+        # Apply NMS after fusion_score is computed to penalize near-duplicates properly
+        candidates = self._executor._apply_nms(candidates)
+        
         candidates.sort(key=lambda c: c.fusion_score, reverse=True)
         
-        # === STEP 5: VQA Re-ranking (Role D) ===
-        # [DISABLED] The local machine is running out of memory (OS Error 1455 Paging file too small) 
-        # when trying to load Qwen2-VL-2B. We will bypass this for the MVP testing phase.
-        '''
-        top_20 = candidates[:20]
-        if top_20:
-            try:
-                import sys
-                import os
-                import base64
-                PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-                sys.path.insert(0, os.path.join(PROJECT_ROOT, "tools"))
-                from tools.review_tool import resolve_keyframe_b64
-                from src.role_c_logic.vqa_model import get_vqa_engine
+        # === STEP 5: VQA Re-ranking (Role D - Agent 3 Escalation) ===
+        try:
+            from src.role_c_logic.executor import should_escalate_to_vlm
+            from src.role_c_logic.vlm_client import GeminiVisionClient
+            from src.role_c_logic.prompt_generator import ir_graph_to_prompt
+            
+            # Quota Free Safe: Giới hạn chỉ escalate tối đa top-10 candidates để tránh Rate Limit 429
+            top_vlm_pool = candidates[:10]
+            escalated_candidates = [c for c in top_vlm_pool if should_escalate_to_vlm(c, ir_graph)]
+            
+            if escalated_candidates:
+                vlm_client = GeminiVisionClient()
+                vlm_prompt = ir_graph_to_prompt(ir_graph, question=question)
+                prompt_version = "v2_qa" if question else "v1" # Can be updated if prompt structure changes
                 
-                vqa_engine = get_vqa_engine()
-                for c in top_20:
-                    b64_str, _, _ = resolve_keyframe_b64(c.video_id, c.frame_idx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"))
-                    if b64_str:
-                        image_bytes = base64.b64decode(b64_str.split(",")[1])
-                        # Check if image matches the query
-                        if vqa_engine.verify_image_match(image_bytes, raw_text):
-                            c.fusion_score += 10.0 # Huge bonus for VQA match
-                        else:
-                            c.fusion_score -= 2.0  # Penalty for mismatch
-            except Exception as e:
-                print(f"[Pipeline] VQA Re-ranking failed or skipped: {e}")
+                print(f"  [Pipeline] Escalating {len(escalated_candidates)} candidates to Gemini VLM...")
+                results = vlm_client.verify_candidates_batch(escalated_candidates, vlm_prompt, ir_graph.raw_text, prompt_version)
                 
-        # Re-sort after VQA bonuses
+                for c, res in zip(escalated_candidates, results):
+                    is_match = res.get("match", False)
+                    vqa_answer = res.get("answer", None)
+                    c.vqa_answer = vqa_answer
+                    
+                    if is_match:
+                        c.fusion_score += 5.0 # RANK_1_BONUS
+                        ans_str = f" | Ans: {vqa_answer}" if vqa_answer else ""
+                        print(f"    -> VLM Match for {c.video_id}:{c.frame_idx} (Bonus +5.0){ans_str}")
+                    else:
+                        print(f"    -> VLM Mismatch for {c.video_id}:{c.frame_idx}")
+                        
+        except Exception as e:
+            print(f"  [Pipeline] Gemini VLM Re-ranking failed: {e}")
+            
+        # === STEP 5.5: Post-VLM Temporal Interpolation & Betting Optimization ===
+        # Kích hoạt CHỈ KHI có VLM-confirmed anchor (fusion >= 5.0 = clip+obj+spatial MAX + RANK_1_BONUS).
+        # Mục đích: Cover AIC's ±5-frame scoring window quanh anchor đã xác nhận.
+        #
+        # BUG FIXES (Plan C):
+        #   C1: fps lấy từ anchor.fps (NPZ) thay vì frame_idx/pts_time (sai)
+        #   C2: threshold 4.0 -> 5.0 (chỉ VLM-confirmed, không phải high-score tự nhiên)
+        #   C3: Giới hạn MAX_SYNTHETIC_PER_ANCHOR=10, MAX_SYNTHETIC_TOTAL=30
+        #   C4: betting_interval=3 (target AIC ±5-frame window, không thừa slots)
+        MAX_SYNTHETIC_PER_ANCHOR = 10   # Đủ để cover window ±5 frames với interval=3
+        MAX_SYNTHETIC_TOTAL      = 30   # Tổng synthetics <= 30% Top-100
+        BETTING_INTERVAL         = 3    # frames — target AIC's ±5-frame hit window
+        INTERPOLATE_WINDOW_SEC   = 1.5  # +/- 1.5s (thay vì 3s — tránh flood)
+
+        anchor_frames = [c for c in candidates if c.fusion_score >= 5.0]  # C2: chỉ VLM-confirmed
+        if anchor_frames:
+            print(f"  [Pipeline] Temporal Interpolation: {len(anchor_frames)} VLM-confirmed anchor(s)")
+            new_synthetic_candidates = []
+            total_synthetics = 0
+
+            for anchor in anchor_frames:
+                if total_synthetics >= MAX_SYNTHETIC_TOTAL:
+                    break
+
+                # C1: Dùng anchor.fps từ NPZ (chính xác), không tính lại
+                fps = anchor.fps if (anchor.fps and 10.0 <= anchor.fps <= 60.0) else 30.0
+
+                frames_to_span = int(INTERPOLATE_WINDOW_SEC * fps)
+                start_frame = max(0, anchor.frame_idx - frames_to_span)
+                end_frame   = anchor.frame_idx + frames_to_span
+                anchor_synthetics = 0
+
+                # Interpolate left
+                curr_frame = anchor.frame_idx - BETTING_INTERVAL
+                while curr_frame >= start_frame and anchor_synthetics < MAX_SYNTHETIC_PER_ANCHOR and total_synthetics < MAX_SYNTHETIC_TOTAL:
+                    dist_sec = abs(anchor.frame_idx - curr_frame) / fps
+                    new_synthetic_candidates.append(CandidateFrame(
+                        faiss_id=-1,
+                        video_id=anchor.video_id,
+                        frame_idx=int(curr_frame),
+                        pts_time=curr_frame / fps,
+                        fps=fps,
+                        clip_score=anchor.clip_score,
+                        obj_score=anchor.obj_score,
+                        spatial_score=anchor.spatial_score,
+                        fusion_score=anchor.fusion_score - 0.05 * dist_sec,
+                        vqa_answer=anchor.vqa_answer
+                    ))
+                    curr_frame -= BETTING_INTERVAL
+                    anchor_synthetics += 1
+                    total_synthetics  += 1
+
+                # Interpolate right
+                curr_frame = anchor.frame_idx + BETTING_INTERVAL
+                while curr_frame <= end_frame and anchor_synthetics < MAX_SYNTHETIC_PER_ANCHOR and total_synthetics < MAX_SYNTHETIC_TOTAL:
+                    dist_sec = abs(curr_frame - anchor.frame_idx) / fps
+                    new_synthetic_candidates.append(CandidateFrame(
+                        faiss_id=-1,
+                        video_id=anchor.video_id,
+                        frame_idx=int(curr_frame),
+                        pts_time=curr_frame / fps,
+                        fps=fps,
+                        clip_score=anchor.clip_score,
+                        obj_score=anchor.obj_score,
+                        spatial_score=anchor.spatial_score,
+                        fusion_score=anchor.fusion_score - 0.05 * dist_sec,
+                        vqa_answer=anchor.vqa_answer
+                    ))
+                    curr_frame += BETTING_INTERVAL
+                    anchor_synthetics += 1
+                    total_synthetics  += 1
+
+            print(f"  [Pipeline] Generated {total_synthetics} synthetic frame(s) (cap={MAX_SYNTHETIC_TOTAL})")
+            candidates.extend(new_synthetic_candidates)
+
+            # Deduplicate by (video_id, frame_idx) — keep highest score
+            seen = {}
+            unique_candidates = []
+            candidates.sort(key=lambda c: c.fusion_score, reverse=True)
+            for c in candidates:
+                key = f"{c.video_id}_{c.frame_idx}"
+                if key not in seen:
+                    seen[key] = True
+                    unique_candidates.append(c)
+            candidates = unique_candidates
+
+        # Re-sort after VQA bonuses and Temporal Boosting
         candidates.sort(key=lambda c: c.fusion_score, reverse=True)
-        '''
 
         latency = (time.time() - t_start) * 1000
 
@@ -176,6 +270,7 @@ def to_submission(result: PipelineResult, top_k: int = TOP_K_SUBMIT) -> Submissi
             video_id=c.video_id,
             frame_id=c.frame_idx,
             confidence_score=c.clip_score,
+            vqa_answer=c.vqa_answer
         ))
     return SubmissionOutput(
         query_id=result.query_id,
@@ -189,10 +284,21 @@ def export_csv(submissions: List[SubmissionOutput], output_path: str = "outputs/
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["query_id", "rank", "video_id", "frame_id", "clip_score"])
+        
+        # Check if it's QA based on first item
+        is_qa = False
+        if submissions and submissions[0].query_type == QueryType.QA:
+            is_qa = True
+            writer.writerow(["video_id", "frame_idx", "answer"])
+        else:
+            writer.writerow(["query_id", "rank", "video_id", "frame_id", "clip_score"])
+            
         for sub in submissions:
             for item in sub.items:
-                writer.writerow([sub.query_id, item.rank, item.video_id, item.frame_id, f"{item.confidence_score:.6f}"])
+                if is_qa:
+                    writer.writerow([item.video_id, item.frame_id, item.vqa_answer or ""])
+                else:
+                    writer.writerow([sub.query_id, item.rank, item.video_id, item.frame_id, f"{item.confidence_score:.6f}"])
     print(f"  [MVP] Submission saved to {output_path}")
     return output_path
 

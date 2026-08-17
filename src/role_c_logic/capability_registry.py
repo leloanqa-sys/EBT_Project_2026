@@ -32,7 +32,7 @@ class CapabilityRegistry:
             "DETECT": OperatorDef("DETECT", "Faster R-CNN", OperatorCost.LOW, CapabilityStatus.READY),
             
             # Attribute Filters
-            # M0 showed that attribute/color filtering is a bottleneck, so it's marked EXPERIMENTAL
+            # Marked EXPERIMENTAL to prevent rate limit lock on free API keys
             "FILTER_ATTRIBUTE": OperatorDef("FILTER_ATTRIBUTE", "CLIP/Crop", OperatorCost.MEDIUM, CapabilityStatus.EXPERIMENTAL),
             
             # Spatial Checks
@@ -40,15 +40,14 @@ class CapabilityRegistry:
             "SPATIAL_RIGHT_OF": OperatorDef("SPATIAL_RIGHT_OF", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             "SPATIAL_ABOVE": OperatorDef("SPATIAL_ABOVE", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             "SPATIAL_BELOW": OperatorDef("SPATIAL_BELOW", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
-            # "Behind" is hard to infer purely from 2D bounding boxes without depth estimation, so EXPERIMENTAL
             "SPATIAL_BEHIND": OperatorDef("SPATIAL_BEHIND", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.EXPERIMENTAL),
             "SPATIAL_FRONT": OperatorDef("SPATIAL_FRONT", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.EXPERIMENTAL),
             
-            # Advanced / Missing Capabilities -> Deferred to VQA (Qwen2-VL)
+            # Advanced / Missing Capabilities
             "COUNT": OperatorDef("COUNT", "None", OperatorCost.HIGH, CapabilityStatus.DEFER),
             "OCR": OperatorDef("OCR", "None", OperatorCost.HIGH, CapabilityStatus.DEFER),
-            "EVENT_ACTION": OperatorDef("EVENT_ACTION", "Action Recognition", OperatorCost.HIGH, CapabilityStatus.DEFER),
-            "VLM_VERIFY": OperatorDef("VLM_VERIFY", "Gemini Vision", OperatorCost.HIGH, CapabilityStatus.DEFER)
+            "EVENT_ACTION": OperatorDef("EVENT_ACTION", "Action Recognition", OperatorCost.HIGH, CapabilityStatus.EXPERIMENTAL),
+            "VLM_VERIFY": OperatorDef("VLM_VERIFY", "Gemini Vision", OperatorCost.HIGH, CapabilityStatus.EXPERIMENTAL)
         }
     
     def get_operator(self, name: str) -> Optional[OperatorDef]:

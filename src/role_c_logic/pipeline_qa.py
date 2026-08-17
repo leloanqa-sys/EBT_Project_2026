@@ -3,12 +3,12 @@ import uuid
 from typing import List, Dict, Optional
 from src.common.schemas import CandidateFrame
 from src.pipeline import MVPPipeline, PipelineResult
-from src.role_c_logic.vqa_model import get_vqa_engine
+from src.role_c_logic.vlm_client import GeminiVisionClient
 
 class QAPipeline:
     def __init__(self, detect_threshold: float = 0.3):
         self.kis_pipeline = MVPPipeline(detect_threshold=detect_threshold, top_k_retrieve=500)
-        self.vqa_engine = get_vqa_engine()
+        self.vqa_engine = GeminiVisionClient()
         
     def run(self, query_id: str, event_description: str, question: str, top_k: int = 5) -> Dict:
         """
@@ -31,9 +31,17 @@ class QAPipeline:
                 "evidence_candidates": []
             }
             
-        # Try to extract the best image to feed to VLM
+        # Tìm candidate tốt nhất được VLM xác nhận (hoặc fallback về candidate[0])
+        # Hệ thống KIS pipeline chạy trước đó đã gọi VLM verify và cộng điểm 5.0 (VLM Match) nếu khớp
         best_candidate = candidates[0]
+        for c in candidates:
+            # Nếu frame có điểm fusion_score cao bất thường (>= 5.0 do được cộng RANK_1_BONUS từ VLM verify)
+            if c.fusion_score >= 5.0:
+                best_candidate = c
+                break
+                
         image_bytes = None
+        b64_str = None
         
         try:
             import sys
@@ -55,10 +63,10 @@ class QAPipeline:
             print(f"[QA] Error extracting image for VLM: {e}")
             
         # 2. Get Answer from VLM
-        if image_bytes:
+        if b64_str:
             # We prepend the instruction to make it focus on QA
             prompt = f"Dựa vào hình ảnh này, hãy trả lời câu hỏi ngắn gọn: {question}"
-            answer = self.vqa_engine.answer_question(image_bytes, prompt)
+            answer = self.vqa_engine._call_api(prompt, [b64_str])
         else:
             answer = "Lỗi: Không trích xuất được hình ảnh để đưa vào VLM."
             

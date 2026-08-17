@@ -30,11 +30,13 @@ from api.routes.kis_routes import get_video_metadata
 
 @router.post("/search/qa", response_model=QAResponse)
 async def search_qa(req: QARequest):
+    from fastapi.concurrency import run_in_threadpool
     try:
         pipeline = QAPipeline(detect_threshold=0.3)
         query_id = f"qa_{uuid.uuid4().hex[:8]}"
         
-        result = pipeline.run(
+        result = await run_in_threadpool(
+            pipeline.run,
             query_id=query_id,
             event_description=req.query,
             question=req.question,

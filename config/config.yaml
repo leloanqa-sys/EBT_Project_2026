@@ -1,4 +1,5 @@
 # EBT 2026 Project Configuration File
+# ===================================
 
 project:
   name: "EBT_Project_2026"
@@ -11,42 +12,46 @@ paths:
   keyframes_dir: "data/raw/keyframes"
   objects_dir: "data/raw/objects"
   metadata_dir: "data/raw/metadata"
+  zips_dir: "data/zips"
   
   processed_dir: "data/processed"
-  clip_features_file: "data/processed/clip_features.npy"
+  metadata_db: "data/processed/metadata.db"
   faiss_index_dir: "data/processed/faiss_index"
   cache_dir: "data/processed/cache"
   
   outputs_dir: "outputs"
+  verdicts_dir: "outputs/verdicts"
+  reviews_dir: "outputs/reviews"
+  traces_dir: "outputs/traces"
 
 models:
   clip:
     model_name: "ViT-B/32"
+    pretrained: "openai"
     device: "cuda"  # fallback to 'cpu' if no GPU available
-  vqa:
-    model_name: "Salesforce/blip-vqa-base"
-    max_top_k_frames: 10
   faster_rcnn:
     confidence_threshold: 0.3
+    max_entities: 584
+  vlm:
+    provider: "gemini"
+    model_name: "gemini-1.5-flash"
+    batch_top_k: 5
+    cache_enabled: true
 
-faiss:
-  index_type: "IndexFlatIP"  # Inner product for normalized cosine similarity
-  dimension: 512
-  top_k: 100
+retrieval:
+  top_k_retrieve: 500
+  top_k_submit: 100
+  top_k_review: 20
 
 scoring:
-  weights:
-    clip: 0.70
-    object: 0.20
-    metadata: 0.10
+  baseline_weights:
+    w_clip: 1.00
+    w_obj: 0.50
+    w_spatial: 0.50
+  nms_min_seconds: 5.0
+  nms_penalty: 1.0
 
 ranking:
-  budgets: [1, 5, 20, 50, 100]
-
-role_c:
-  top_k_raw: 300
+  strategy: "diversify"
+  five_budget_max_videos: 4
   cluster_gap_threshold: 15
-  ranking_strategy: "diversify"
-  vqa_model: "gemini/gemini-1.5-flash"
-  low_confidence_threshold: 0.25
-

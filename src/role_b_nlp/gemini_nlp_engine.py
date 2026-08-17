@@ -61,7 +61,7 @@ import warnings
 import urllib3
 warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
 
-def get_available_gemini_models(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_available_gemini_models(api_key: Optional[str] = None) -> List[dict[str, Any]]:
     """
     Trích xuất danh sách các models Gemini active và thông số quota (input/output token limits).
     """
@@ -133,6 +133,7 @@ def compile_to_visual_ir(query_id: str, raw_text: str, query_type: str) -> Visua
 
     schema_str = """
 {
+  "clip_query_en": "a girl alone in a red shirt",
   "entities": [{"id": "e1", "label": "person"}],
   "attributes": [{"entity_id": "e1", "name": "shirt_color", "value": "red", "polarity": "POSITIVE"}],
   "relations": [{"source_id": "e1", "target_id": "e2", "relation_type": "behind", "surface_form": "phía sau", "polarity": "POSITIVE"}],
@@ -140,50 +141,63 @@ def compile_to_visual_ir(query_id: str, raw_text: str, query_type: str) -> Visua
   "temporal_constraints": [{"source_id": "v1", "target_id": "v2", "relation": "after"}],
   "order_constraints": [{"target_id": "e1", "axis": "horizontal", "direction": "left_to_right"}],
   "selection_constraints": [{"target_id": "e1", "rank": 2}],
-  "meta": {"confidence": 0.9, "ambiguous_notes": ""}
+  "meta": {"confidence": 0.9, "ambiguous_notes": ""},
+  "scoring_plan": {
+    "context_type": "color_attribute",
+    "w_clip": 1.5,
+    "w_obj": 0.2,
+    "w_spatial": 0.3,
+    "vlm_required": true,
+    "vlm_top_k": 10,
+    "clip_k": 500,
+    "rationale": "Query contains color detail 'red shirt' which Faster R-CNN cannot verify directly"
+  }
 }
     """
 
     prompt = f"""
-You are a Computer Vision Semantic Compiler for a video-retrieval competition (AIC 2026). Your only job is to convert one natural-language query (Vietnamese or English) into the Visual IR Graph schema below, by reasoning through a fixed set of SKILLS in order. You are not answering the query — you are structuring it. Stay strictly within what the query states or clearly implies; the retrieval system downstream (CLIP embeddings, object detector, temporal DAG executor) will handle fuzzy matching, so your job is faithful structuring, not exhaustive labeling.
+You are a Computer Vision Semantic Compiler and Query Planner for a video-retrieval competition (AIC 2026). Your job is to convert one natural-language query (Vietnamese or English) into the Visual IR Graph schema below, by reasoning through a fixed set of SKILLS in order.
 
 BEFORE YOU START — QUERY TYPE CHECK:
-The query belongs to one of three official formats defined by the organizers: (1) Textual KIS — a single scene description, (2) Q&A — a scene description plus one factual question about it, (3) TRAKE — a description of an ordered sequence of sub-events within one action. Identify silently which type this is; it changes which skills below are likely relevant, but does not change the output schema.
+Identify if the query is: (1) Textual KIS (single scene), (2) Q&A (scene description + factual question), or (3) TRAKE (sequential sub-events).
 
-SKILL 1 — ENTITY GROUNDING (always run first)
-Trigger: any noun phrase referring to a visible physical object, person, or group in the scene.
-Procedure: create one entity per distinct visible thing the query treats as a separate object. Do not split one object into multiple entities, and do not merge two distinct objects into one. Label each entity in canonical English (lowercase, singular, generic — e.g. the general category of the object, not a brand or overly specific term). If you are unsure of the exact category, use the most general accurate term rather than guessing a specific one.
+SKILL 0 — CLIP QUERY TRANSLATION
+Provide a smooth, natural English translation of the visual scene in `clip_query_en`. Remove ALL quotation marks, special characters, and punctuation that might break CLIP tokenization.
+
+SKILL 1 — ENTITY GROUNDING
+Trigger: any noun phrase referring to physical objects/people. Canonical English names.
 
 SKILL 2 — ATTRIBUTE BINDING
-Trigger: an adjective, color, clothing detail, count, size, or other descriptive property attached to an entity.
-Procedure: attach as {{entity_id, name, value, polarity}}. `name` should be a short canonical property key (what kind of property it is), `value` the property itself, both in English regardless of query language. Only bind attributes explicitly stated — do not infer unstated properties (e.g. do not assume gender, age, or emotion unless the query says so).
+Trigger: colors, clothing, counts, descriptors. Bind explicitly.
 
-SKILL 3 — RELATION EXTRACTION (spatial/possessive)
-Trigger: a phrase describing how two entities relate in space or possession within a single instant (position, holding, wearing, containment).
-Procedure: pick the relation_type that most literally matches the query's spatial/possessive meaning — prefer the most generic accurate term over a narrow invented one. Always keep the original phrase in surface_form so downstream logging can catch mismatches.
+SKILL 3 — RELATION EXTRACTION
+Trigger: spatial, possessive, wearing, holding, or containment relations.
 
-SKILL 4 — EVENT EXTRACTION (action within one moment)
-Trigger: a verb phrase describing what an entity is doing, distinct from a static relation.
-Procedure: one event per distinct action, with participants listed by entity id. `action` should be a canonical English verb-based tag describing the action generically — do not invent narrower categories than the query supports, and do not paraphrase into an action the query didn't state.
+SKILL 4 — EVENT EXTRACTION
+Trigger: action verb phrases (e.g. running, arguing).
 
-SKILL 5 — TEMPORAL SEQUENCING (multi-event ordering)
-Trigger: the query describes more than one event AND specifies or implies their order in time (this is the dominant skill for TRAKE-type queries with numbered/sequential sub-events).
-Procedure: only create temporal_constraints between events that already exist from Skill 4. Use "before"/"after"/"during"/"overlaps" strictly as the query's wording supports — if order is implied only by narrative sequence (e.g. numbered steps), treat that as "after" chains unless the query says otherwise.
+SKILL 5 — TEMPORAL SEQUENCING
+Trigger: sequential actions, time relation indicators ("before", "after").
 
-SKILL 6 — SPATIAL ORDERING (rank among peers)
-Trigger: the query distinguishes an entity from similar entities by spatial position along an axis (leftmost, second from the right, closest to camera, etc.), NOT by time.
-Procedure: this always produces TWO separate outputs — an order_constraint describing the axis/direction, and a selection_constraint giving the rank. Never fold them into one field, since they answer different questions (how to sort vs. which position to pick).
+SKILL 6 — SPATIAL ORDERING
+Trigger: spatial positions (e.g. leftmost, second from right).
 
-SKILL 7 — NEGATION SWEEP (run last, over everything already extracted)
-Trigger: any explicit negation, absence, or exclusion in the query text (words meaning "without", "not", "no one who...", "excluding").
-Procedure: find which attribute/relation/event the negation scopes over, and flip its polarity to "NEGATIVE" instead of creating a separate "absence" entity. If the negation refers to something with no clear antecedent entity/relation already extracted, do not fabricate a new one just to negate it — instead note the gap in meta.ambiguous_notes.
+SKILL 7 — NEGATION SWEEP
+Scope negation over attributes/relations/events with NEGATIVE polarity.
 
-SELF-CHECK BEFORE OUTPUT (run silently, do not print your reasoning):
-- Does every id used in relations/events/temporal_constraints/order_constraints/selection_constraints exist in entities or events?
-- Did I add anything the query did not state or clearly imply? If yes, remove it.
-- Did I skip anything the query stated? If yes, add it.
-- Is every enum-like field (polarity, axis, direction, temporal relation) filled with one of exactly: polarity ∈ {{"POSITIVE","NEGATIVE"}}; axis ∈ {{"horizontal","vertical","depth"}}; direction ∈ {{"left_to_right","right_to_left","top_to_bottom","bottom_to_top","near_to_far","far_to_near"}}; temporal relation ∈ {{"before","after","during","overlaps"}}?
-- Set meta.confidence (0.0–1.0) honestly — lower it whenever a skill above had to guess or a term didn't map cleanly. Use meta.ambiguous_notes (English, one short sentence) for anything you weren't fully sure about; leave it empty string if none.
+SKILL 8 — SCORING PLAN (DYNAMIC WEIGHT MATRIX)
+Based on the query context, define the best execution weights (w_clip, w_obj, w_spatial) to optimize accuracy and prevent object-score bias (e.g., person-detection hubness):
+1. context_type: Choose exactly one of: "default", "color_attribute", "scene_context", "spatial_heavy", "action_event", "trake_sequence".
+2. w_clip (range: [0.0, 2.0]): Scale higher for scenes (1.8) or color/attributes (1.5) where CLIP has superior understanding.
+3. w_obj (range: [0.0, 2.0]): Scale lower for scene_context (0.05) or color_attribute (0.2) to prevent general object tags (e.g. person, clothing) from flooding results. Scale higher (0.6 - 1.0) for concrete physical objects.
+4. w_spatial (range: [0.0, 2.0]): Scale higher (1.2) for spatial relations.
+5. vlm_required: Set to true if the query contains color descriptors, actions, text, or complex relationships that require visual validation.
+6. vlm_top_k (range: [1, 20]): Number of top candidates to escalate (Free key safety: limit to max 10 if vlm_required is true).
+7. clip_k (range: [100, 1000]): Retrievable candidates from CLIP (default 500).
+
+SELF-CHECK BEFORE OUTPUT:
+- All constraints and references must point to existing entity ids.
+- Scoring plan weight ranges are strictly bounded.
 
 OUTPUT CONTRACT:
 Return ONLY the JSON object matching this exact schema — no markdown fences, no prose before or after: 
@@ -207,7 +221,7 @@ Query: "{raw_text}"
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         try:
             # Added verify=False to bypass Windows local SSL issues
-            resp = requests.post(url, json=payload, timeout=10.0, verify=False)
+            resp = requests.post(url, json=payload, timeout=60.0, verify=False)
             if resp.status_code == 200:
                 res_json = resp.json()
                 raw_text_resp = res_json["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -228,6 +242,7 @@ Query: "{raw_text}"
                 
                 parsed["query_id"] = query_id
                 parsed["raw_text"] = raw_text
+                parsed.setdefault("clip_query_en", "")
                 parsed["query_type"] = query_type
                 parsed["ir_version"] = "1.0"
                 

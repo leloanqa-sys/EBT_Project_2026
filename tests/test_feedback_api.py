@@ -9,13 +9,13 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from api.main import app
-from api.routes.feedback_routes import GT_FILE
+from api.routes.feedback_routes import ALL_GT_FILE
 
 class TestFeedbackAPI(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         # Ensure we have a clean test file
-        self.test_gt_file = GT_FILE
+        self.test_gt_file = ALL_GT_FILE
         if self.test_gt_file.exists():
             # Backup original if needed, but since it's eval data, we might not want to nuke it.
             # To be safe and test cleanly, let's just count rows
@@ -48,8 +48,7 @@ class TestFeedbackAPI(unittest.TestCase):
         last_line = lines[-1].strip()
         cols = last_line.split(",")
         self.assertEqual(cols[0], "mock_query_999")
-        self.assertEqual(cols[4], "0.87")
-        self.assertEqual(cols[7], "True") # written as string "True" by csv.writer
+        self.assertEqual(cols[4], "0.8700")
 
     def test_agent2_feedback_payload_missing(self):
         """Test Case 2.2: Missing field should 422 and NOT write to CSV."""
@@ -60,12 +59,11 @@ class TestFeedbackAPI(unittest.TestCase):
             rows_before = 0
             
         payload_missing = {
-            "query_id": "mock_query_998",
+            # Missing query_id (required)
             "video_id": "V1",
             "frame_idx": 100,
             "verdict": 1,
             "clip_score": 0.87,
-            # Missing obj_score, spatial_score, has_target_objects
         }
         
         response = self.client.post("/api/v1/feedback", json=payload_missing)

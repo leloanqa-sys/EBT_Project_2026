@@ -33,6 +33,7 @@ async def search_trake(req: TRAKERequest):
         
         result = pipeline.run(
             query_id=query_id,
+            main_query=req.query,
             sub_events=req.events,
             top_k=req.top_k,
             max_time_gap_seconds=30.0

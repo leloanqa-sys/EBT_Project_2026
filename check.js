@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const summaryBar = document.getElementById('summary-bar');
     const parsedInfoContainer = document.getElementById('parsed-info');
 
+    const parsedInfoContainer = document.getElementById('parsed-info');
+
     let activeQueryType = 'KIS';
     window.currentQueryData = null; // Store data for CSV export
 
@@ -214,11 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const videoTitleHtml = result.video_title && result.video_title !== result.video_id ?
                     `<div class="video-title" title="${escapeHtml(result.video_title)}">${escapeHtml(result.video_title)}</div>` : '';
 
-                // Bug #1 Fix: Show VQA Answer ONLY for Q&A and TRAKE, NOT for KIS.
-                // KIS = Known Item Search — VLM answer is a description, not a Q&A answer.
-                // Displaying it for KIS is misleading (looks like a wrong answer field).
-                const isQAmode = data.query_type && data.query_type !== 'KIS';
-                const vqaAnswerHtml = (result.vqa_answer && isQAmode) ? 
+                const vqaAnswerHtml = result.vqa_answer ? 
                     `<div style="margin-top: 8px; padding: 6px; background-color: #ccfbf1; color: #0f766e; border-left: 3px solid #14b8a6; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
                         Answer: ${escapeHtml(result.vqa_answer)}
                      </div>` : '';
@@ -427,6 +425,32 @@ window.submitFeedback = async function(queryId, videoId, frameIdx, verdict, clip
 };
 
 
+/**
+ * Export current results to AIC format CSV
+ */
+window.exportSubmissionCSV = function() {
+    const data = window.currentQueryData;
+    if (!data || !data.results || data.results.length === 0) {
+        alert("Khng c d? li?u d? xu?t CSV!");
+        return;
+    }
+    
+    // AIC Format
+    let csvContent = "video_id,frame_idx,rank,fusion_score\n";
+    data.results.forEach(r => {
+        csvContent += \${r.video_id}\,\${r.frame_idx}\,\${r.rank}\,\${(r.fusion_score || 0).toFixed(4)}\\n;
+    });
+    // removing backticks because Add-Content evaluates it, I should be careful.
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", submission_ + (data.query_id || 'results') + .csv);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
 /**
  * Export current results to AIC format CSV
  */

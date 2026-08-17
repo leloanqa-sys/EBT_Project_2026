@@ -7,7 +7,7 @@ class TRAKEPipeline:
         # We reuse MVPPipeline as the base retriever for individual sub-events
         self.kis_pipeline = MVPPipeline(detect_threshold=detect_threshold, top_k_retrieve=300)
 
-    def run(self, query_id: str, sub_events: List[str], top_k: int = 5, max_time_gap_seconds: float = 30.0) -> Dict:
+    def run(self, query_id: str, main_query: str, sub_events: List[str], top_k: int = 5, max_time_gap_seconds: float = 30.0) -> Dict:
         """
         Runs the TRAKE Pipeline (Temporal Retrieval and Alignment of Key Events).
         Uses Dynamic Programming to find the best sequence of frames.
@@ -23,9 +23,10 @@ class TRAKEPipeline:
         # event_candidates[i] is a list of CandidateFrame for sub_event[i]
         event_candidates = []
         for i, text in enumerate(sub_events):
-            res = self.kis_pipeline.run(f"{query_id}_e{i}", text, query_type="TRAKE_PART")
-            # Limit to top 100 per event to keep DP fast
-            event_candidates.append(res.candidates[:100])
+            full_context_text = f"{main_query}. Phân cảnh: {text}"
+            res = self.kis_pipeline.run(f"{query_id}_e{i}", full_context_text, query_type="TRAKE_PART")
+            # Limit to top 300 per event to increase intersection chances
+            event_candidates.append(res.candidates[:300])
             
         # 2. Group by Video ID
         # Only consider videos that appear in ALL sub-events' candidate lists (or at least many of them)
@@ -59,9 +60,13 @@ class TRAKEPipeline:
             dp = [[] for _ in range(N)]
             backpointers = [[] for _ in range(N)]
             
+            # Helper to get fusion_score safely (fallback to clip_score if not computed)
+            def _get_fscore(cf):
+                return getattr(cf, 'fusion_score', cf.clip_score)
+                
             # Init dp for event 0
             for j, f0 in enumerate(V_cands[0]):
-                dp[0].append(f0.clip_score)
+                dp[0].append(_get_fscore(f0))
                 backpointers[0].append(-1)
                 
             # Fill DP
@@ -71,11 +76,12 @@ class TRAKEPipeline:
                     max_prev_score = -1.0
                     best_prev_idx = -1
                     
+                    fi_score = _get_fscore(fi)
                     for k, fk in enumerate(V_cands[i-1]):
-                        # Constraint: Time must be strictly increasing, but within gap
+                        # Constraint: Time must be increasing, allowing same-frame events
                         time_diff = fi.pts_time - fk.pts_time
-                        if 0 < time_diff <= max_time_gap_seconds:
-                            score = dp[i-1][k] + fi.clip_score
+                        if 0 <= time_diff <= max_time_gap_seconds:
+                            score = dp[i-1][k] + fi_score
                             # Optional: apply penalty for large time gaps
                             penalty = 0.05 * (time_diff / max_time_gap_seconds)
                             score -= penalty

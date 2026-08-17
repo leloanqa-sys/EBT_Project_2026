@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import base64
 import json
@@ -7,6 +8,12 @@ from typing import List, Optional, Tuple, Dict, Set
 import pandas as pd
 from jinja2 import Template
 from src.common.schemas import CandidateFrame
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="vi">
@@ -18,11 +25,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 15px; }
         
         /* Control Bar */
-        .control-bar { position: sticky; top: 10px; z-index: 100; background: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #38bdf8; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
-        .shortcuts { display: flex; gap: 15px; font-size: 0.9em; }
+        .control-bar { position: sticky; top: 10px; z-index: 100; background: #1e293b; padding: 15px; border-radius: 10px; border: 1px solid #38bdf8; box-shadow: 0 4px 20px rgba(0,0,0,0.5); display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px; }
+        .shortcuts { display: flex; gap: 12px; font-size: 0.88em; flex-wrap: wrap; }
         .key { background: #334155; color: #38bdf8; padding: 2px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #475569; }
         
-        .stats { display: flex; gap: 20px; font-weight: bold; }
+        .stats { display: flex; gap: 12px; font-weight: bold; font-size: 0.9em; align-items: center; }
         .stat-box { background: #0f172a; padding: 6px 12px; border-radius: 6px; border: 1px solid #334155; }
         
         .btn-export { background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
@@ -35,6 +42,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .card { background: #1e293b; border-radius: 10px; padding: 14px; border: 2px solid #334155; transition: all 0.2s; position: relative; }
         .card.active { border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
         .card.verdict-match { border-color: #22c55e; background: #064e3b22; }
+        .card.verdict-uncertain { border-color: #f59e0b; background: #78350f22; }
         .card.verdict-mismatch { border-color: #ef4444; background: #7f1d1d22; }
         
         /* Image Preview Box */
@@ -50,26 +58,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold; background: #0284c7; color: white; margin-bottom: 8px; }
         .verdict-tag { float: right; font-weight: bold; font-size: 0.85em; }
         .tag-match { color: #4ade80; }
+        .tag-uncertain { color: #fbbf24; }
         .tag-mismatch { color: #f87171; }
         
         .card-header { font-weight: bold; color: #f1f5f9; margin-bottom: 4px; font-size: 1.05em; }
         .meta { font-size: 0.85em; color: #94a3b8; }
-        .score { color: #4ade80; font-weight: bold; }
+        .score-row { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #0f172a; padding: 6px 8px; border-radius: 6px; margin: 6px 0; font-size: 0.82em; border: 1px solid #334155; }
+        .score-val { color: #38bdf8; font-weight: bold; }
+        .score-fusion { color: #4ade80; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h1>🔍 Smart Visual Audit Tool (Visual Keyframe Preview + Object Tags)</h1>
+    <h1>🔍 Smart Visual Audit Tool (Visual Keyframe Preview + 3-State Verdict)</h1>
 
     <div class="control-bar">
         <div class="shortcuts">
-            <span><span class="key">1</span> / <span class="key">Y</span> : Khớp (MATCH ✅)</span>
-            <span><span class="key">0</span> / <span class="key">N</span> : Sai (MISMATCH ❌)</span>
-            <span><span class="key">J</span> / <span class="key">K</span> : Thao tác Thẻ Kế/Trước</span>
-            <span><span class="key">Ctrl + S</span> : Xuất File Verdict</span>
+            <span><span class="key">1</span>/<span class="key">Y</span>: Khớp (MATCH ✅)</span>
+            <span><span class="key">2</span>/<span class="key">U</span>: Không chắc (UNCERTAIN ⚠️)</span>
+            <span><span class="key">0</span>/<span class="key">N</span>: Sai (MISMATCH ❌)</span>
+            <span><span class="key">J</span>/<span class="key">K</span>: Kế/Trước</span>
+            <span><span class="key">Ctrl + S</span>: Xuất CSV</span>
         </div>
         <div class="stats">
             <div class="stat-box">Đã Chấm: <span id="stat-count" style="color:#38bdf8">0/{{ items|length }}</span></div>
-            <div class="stat-box">Độ Chính Xác: <span id="stat-acc" style="color:#4ade80">0.0%</span></div>
+            <div class="stat-box">✅ <span id="stat-match" style="color:#4ade80">0</span></div>
+            <div class="stat-box">⚠️ <span id="stat-uncertain" style="color:#fbbf24">0</span></div>
+            <div class="stat-box">❌ <span id="stat-mismatch" style="color:#f87171">0</span></div>
             <button class="btn-export" onclick="exportVerdictCSV()">💾 Xuất CSV Verdict</button>
         </div>
     </div>
@@ -81,7 +95,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     
     <div class="grid" id="card-grid">
     {% for item in items %}
-        <div class="card {% if loop.first %}active{% endif %}" data-index="{{ loop.index0 }}" data-video="{{ item.candidate.video_id }}" data-frame="{{ item.candidate.frame_idx }}" data-score="{{ item.candidate.clip_score }}">
+        <div class="card {% if loop.first %}active{% endif %}" 
+             data-index="{{ loop.index0 }}" 
+             data-video="{{ item.candidate.video_id }}" 
+             data-frame="{{ item.candidate.frame_idx }}" 
+             data-clip-score="{{ item.candidate.clip_score }}"
+             data-obj-score="{{ item.candidate.obj_score }}"
+             data-spatial-score="{{ item.candidate.spatial_score }}"
+             data-fusion-score="{{ item.candidate.fusion_score }}">
             <span class="badge">Rank #{{ loop.index }}</span>
             <span class="verdict-tag" id="tag-{{ loop.index0 }}">⏳ Chờ chấm</span>
             <div class="card-header">{{ item.candidate.video_id }} — Frame {{ item.candidate.frame_idx }}</div>
@@ -108,11 +129,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             {% endif %}
 
+            <div class="score-row">
+                <div>CLIP: <span class="score-val">{{ "%.4f"|format(item.candidate.clip_score) }}</span></div>
+                <div>OBJ: <span class="score-val">{{ "%.2f"|format(item.candidate.obj_score) }}</span></div>
+                <div>SPATIAL: <span class="score-val">{{ "%.2f"|format(item.candidate.spatial_score) }}</span></div>
+                <div>FUSION: <span class="score-fusion">{{ "%.4f"|format(item.candidate.fusion_score) }}</span></div>
+            </div>
+
             <div class="meta">
-                <p>Mapped Keyframe: <strong>n = {{ item.keyframe_n or 'N/A' }}</strong></p>
-                <p>FAISS ID: {{ item.candidate.faiss_id }}</p>
-                <p>Score: <span class="score">{{ "%.4f"|format(item.candidate.clip_score) }}</span></p>
-                <p>PTS Time: {{ "%.2f"|format(item.candidate.pts_time) }}s (FPS: {{ item.candidate.fps }})</p>
+                <p>Mapped Keyframe: <strong>n = {{ item.keyframe_n or 'N/A' }}</strong> | PTS: {{ "%.2f"|format(item.candidate.pts_time) }}s</p>
             </div>
         </div>
     {% endfor %}
@@ -121,6 +146,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <script>
         let activeIndex = 0;
         const totalCards = {{ items|length }};
+        // verdicts: 'MATCH', 'UNCERTAIN', 'MISMATCH', or null
         const verdicts = new Array(totalCards).fill(null);
 
         function updateCardFocus() {
@@ -134,17 +160,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             });
         }
 
-        function setVerdict(index, isMatch) {
-            verdicts[index] = isMatch;
+        function setVerdict(index, status) {
+            verdicts[index] = status;
             const card = document.querySelector(`.card[data-index="${index}"]`);
             const tag = document.getElementById(`tag-${index}`);
 
-            card.classList.remove('verdict-match', 'verdict-mismatch');
-            if (isMatch) {
+            card.classList.remove('verdict-match', 'verdict-uncertain', 'verdict-mismatch');
+            if (status === 'MATCH') {
                 card.classList.add('verdict-match');
                 tag.innerHTML = '✅ KHỚP (MATCH)';
                 tag.className = 'verdict-tag tag-match';
-            } else {
+            } else if (status === 'UNCERTAIN') {
+                card.classList.add('verdict-uncertain');
+                tag.innerHTML = '⚠️ KHÔNG CHẮC (UNCERTAIN)';
+                tag.className = 'verdict-tag tag-uncertain';
+            } else if (status === 'MISMATCH') {
                 card.classList.add('verdict-mismatch');
                 tag.innerHTML = '❌ SAI (MISMATCH)';
                 tag.className = 'verdict-tag tag-mismatch';
@@ -154,21 +184,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         function updateStats() {
             const rated = verdicts.filter(v => v !== null).length;
-            const matches = verdicts.filter(v => v === true).length;
-            const acc = rated > 0 ? ((matches / rated) * 100).toFixed(1) : '0.0';
+            const matches = verdicts.filter(v => v === 'MATCH').length;
+            const uncertains = verdicts.filter(v => v === 'UNCERTAIN').length;
+            const mismatches = verdicts.filter(v => v === 'MISMATCH').length;
             
             document.getElementById('stat-count').innerText = `${rated}/${totalCards}`;
-            document.getElementById('stat-acc').innerText = `${acc}%`;
+            document.getElementById('stat-match').innerText = `${matches}`;
+            document.getElementById('stat-uncertain').innerText = `${uncertains}`;
+            document.getElementById('stat-mismatch').innerText = `${mismatches}`;
         }
 
         function exportVerdictCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,rank,video_id,frame_id,verdict,clip_score\\n";
+            let csvContent = "data:text/csv;charset=utf-8,query_id,rank,video_id,frame_id,verdict,clip_score,obj_score,spatial_score,fusion_score\\n";
             document.querySelectorAll('.card').forEach((card, idx) => {
                 const vid = card.getAttribute('data-video');
                 const frame = card.getAttribute('data-frame');
-                const score = card.getAttribute('data-score');
-                const v = verdicts[idx] === true ? "MATCH" : (verdicts[idx] === false ? "MISMATCH" : "UNRATED");
-                csvContent += `${idx + 1},${vid},${frame},${v},${score}\\n`;
+                const clip = card.getAttribute('data-clip-score') || '0.0';
+                const obj = card.getAttribute('data-obj-score') || '0.0';
+                const spatial = card.getAttribute('data-spatial-score') || '0.0';
+                const fusion = card.getAttribute('data-fusion-score') || '0.0';
+                const v = verdicts[idx] || "UNRATED";
+                csvContent += `{{ query_id }},${idx + 1},${vid},${frame},${v},${clip},${obj},${spatial},${fusion}\\n`;
             });
 
             const encodedUri = encodeURI(csvContent);
@@ -182,11 +218,15 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         document.addEventListener('keydown', (e) => {
             if (e.key === '1' || e.key.toLowerCase() === 'y') {
-                setVerdict(activeIndex, true);
+                setVerdict(activeIndex, 'MATCH');
+                if (activeIndex < totalCards - 1) activeIndex++;
+                updateCardFocus();
+            } else if (e.key === '2' || e.key.toLowerCase() === 'u') {
+                setVerdict(activeIndex, 'UNCERTAIN');
                 if (activeIndex < totalCards - 1) activeIndex++;
                 updateCardFocus();
             } else if (e.key === '0' || e.key.toLowerCase() === 'n') {
-                setVerdict(activeIndex, false);
+                setVerdict(activeIndex, 'MISMATCH');
                 if (activeIndex < totalCards - 1) activeIndex++;
                 updateCardFocus();
             } else if (e.key.toLowerCase() === 'j' || e.key === 'ArrowDown' || e.key === 'ArrowRight') {
@@ -206,6 +246,55 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 """
 
 # Global memory cache to prevent re-scanning zip files repeatedly
+_REMOTE_URL_MAP = None
+
+def get_remote_zip_url(video_id: str) -> Optional[str]:
+    global _REMOTE_URL_MAP
+    if _REMOTE_URL_MAP is None:
+        _REMOTE_URL_MAP = {}
+        csv_path = os.path.join(os.path.dirname(__file__), "..", "spreadsheet_data.csv")
+        try:
+            import csv
+            with open(csv_path, "r", encoding="utf-8") as f:
+                reader = csv.reader(f)
+                next(reader, None)
+                for row in reader:
+                    if len(row) >= 3 and "Keyframes" in row[1]:
+                        fname = row[1].strip()
+                        url = row[2].strip()
+                        _REMOTE_URL_MAP[fname] = url
+        except Exception:
+            pass
+            
+    prefix = video_id.split("_")[0]
+    expected_zip = f"Keyframes_{prefix}.zip"
+    return _REMOTE_URL_MAP.get(expected_zip)
+
+def extract_single_file_from_remote_zip(video_id: str, fname: str) -> Optional[bytes]:
+    """Smart Extraction: Fetches ONLY the required image bytes via HTTP Range from remote ZIP."""
+    url = get_remote_zip_url(video_id)
+    if not url: return None
+    
+    target_suffix = f"{video_id}/{fname}"
+    try:
+        import remotezip
+        import requests
+        from functools import partial
+        session = requests.Session()
+        session.verify = False
+        session.request = partial(session.request, timeout=10.0)
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        with remotezip.RemoteZip(url, session=session) as rz:
+            for inner_name in rz.namelist():
+                if inner_name.endswith(target_suffix):
+                    print(f"  [RemoteZip] Streamed {inner_name} directly from {url}")
+                    return rz.read(inner_name)
+    except Exception as e:
+        print(f"  [RemoteZip] Error: {e}")
+    return None
+
 _ZIP_INDEX_CACHE: Dict[str, Dict[str, str]] = {}
 _DISCOVERED_ZIPS: Optional[List[str]] = None
 
@@ -366,6 +455,14 @@ def resolve_keyframe_b64(video_id: str, frame_idx: int, keyframes_root: str = "d
         b64 = base64.b64encode(mp4_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{b64}", keyframe_n, expected_filename
 
+    # Strategy 4: Smart Remote ZIP HTTP Stream
+    for fname in possible_filenames:
+        img_bytes = extract_single_file_from_remote_zip(video_id, fname)
+        if img_bytes:
+            b64 = base64.b64encode(img_bytes).decode("utf-8")
+            mime = "image/png" if fname.endswith(".png") else "image/jpeg"
+            return f"data:{mime};base64,{b64}", keyframe_n, fname
+
     return None, keyframe_n, expected_filename
 
 def export_review_html(query_id: str, query_text: str, candidates: List[CandidateFrame], out_filepath: str) -> str:
@@ -391,3 +488,64 @@ def export_review_html(query_id: str, query_text: str, candidates: List[Candidat
         f.write(html_content)
         
     return out_filepath
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    import webbrowser
+
+    parser = argparse.ArgumentParser(description="🔍 Review Tool - Tự tạo query và chấm điểm trực quan (3-State Verdict)")
+    parser.add_argument("--query", "-q", type=str, default=None, help="Nội dung câu truy vấn cần tìm kiếm")
+    parser.add_argument("--id", "-i", type=str, default=None, help="Query ID (Ví dụ: Q001, Test_01)")
+    parser.add_argument("--top_k", "-k", type=int, default=20, help="Số lượng kết quả hiển thị để chấm (mặc định: 20)")
+    parser.add_argument("--open", action="store_true", default=True, help="Tự động mở file HTML trên trình duyệt")
+    args = parser.parse_args()
+
+    # If no query provided via args, prompt interactively
+    query_text = args.query
+    query_id = args.id
+
+    if not query_text:
+        print("=" * 60)
+        print("🎯 SMART VISUAL AUDIT & VERIFICATION TOOL")
+        print("=" * 60)
+        query_text = input("👉 Nhập câu truy vấn của bạn (VD: a person riding a bicycle): ").strip()
+        if not query_text:
+            print("❌ Không có nội dung truy vấn. Đang thoát.")
+            sys.exit(0)
+
+    if not query_id:
+        import time
+        query_id = f"Q_{int(time.time()) % 10000:04d}"
+
+    print(f"\n🚀 Đang chạy pipeline cho query [{query_id}]: '{query_text}'...")
+    from src.pipeline import MVPPipeline
+    
+    pipeline = MVPPipeline()
+    result = pipeline.run(query_id=query_id, raw_text=query_text)
+    
+    out_dir = os.path.join("outputs", "reviews")
+    os.makedirs(out_dir, exist_ok=True)
+    out_html = os.path.join(out_dir, f"review_{query_id}.html")
+    
+    candidates_to_review = result.candidates[:args.top_k]
+    export_review_html(query_id, query_text, candidates_to_review, out_html)
+    
+    abs_path = os.path.abspath(out_html)
+    file_uri = f"file:///{abs_path.replace(os.sep, '/')}"
+    print(f"\n✅ Đã tạo xong file Review HTML ({len(candidates_to_review)} candidates)!")
+    print(f"👉 Đường dẫn mở trình duyệt: {file_uri}")
+    print(f"💡 Hướng dẫn chấm:")
+    print("   - Phím 1 / Y : Khớp (MATCH ✅)")
+    print("   - Phím 2 / U : Không chắc chắn (UNCERTAIN ⚠️)")
+    print("   - Phím 0 / N : Sai (MISMATCH ❌)")
+    print("   - Phím J / K : Sang thẻ kế tiếp / Lùi lại")
+    print("   - Phím Ctrl + S : Tải file CSV kết quả (hãy lưu vào outputs/verdicts/)")
+    print("=" * 60)
+
+    if args.open:
+        try:
+            webbrowser.open(file_uri)
+        except Exception:
+            pass
+

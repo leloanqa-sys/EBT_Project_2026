@@ -62,6 +62,20 @@ class MetaInfo(BaseModel):
     confidence: float = 1.0
     ambiguous_notes: str = ""
 
+class ScoringPlan(BaseModel):
+    """
+    Scoring plan created by the Gemini Planner to dynamically shift weights
+    based on query context, protecting API quota and preventing object-score bias.
+    """
+    context_type: str = Field(default="default", description="One of: default, color_attribute, scene_context, spatial_heavy, action_event, trake_sequence")
+    w_clip: float = Field(default=1.0, ge=0.0, le=2.0)
+    w_obj: float = Field(default=0.5, ge=0.0, le=2.0)
+    w_spatial: float = Field(default=0.5, ge=0.0, le=2.0)
+    vlm_required: bool = False
+    vlm_top_k: int = Field(default=10, ge=1, le=50)
+    clip_k: int = Field(default=500, ge=100, le=1000)
+    rationale: str = ""
+
 class VisualIRGraph(BaseModel):
     """
     Role B Contract Output: Visual Intermediate Representation.
@@ -70,6 +84,7 @@ class VisualIRGraph(BaseModel):
     ir_version: str = "1.0"
     query_id: str
     raw_text: str
+    clip_query_en: str = ""
     query_type: str
     entities: List[Entity] = Field(default_factory=list)
     attributes: List[Attribute] = Field(default_factory=list)
@@ -79,6 +94,7 @@ class VisualIRGraph(BaseModel):
     order_constraints: List[OrderConstraint] = Field(default_factory=list)
     selection_constraints: List[SelectionConstraint] = Field(default_factory=list)
     meta: MetaInfo = Field(default_factory=MetaInfo)
+    scoring_plan: ScoringPlan = Field(default_factory=ScoringPlan)
 
 
 @dataclass
@@ -98,6 +114,10 @@ class CandidateFrame:
     obj_score: float = 0.0
     spatial_score: float = 0.0
     fusion_score: float = 0.0
+    vqa_answer: Optional[str] = None
+    
+    # VLM Escalation Flags
+    is_ambiguous: bool = False
 
 @dataclass
 class RankedCandidate:
@@ -122,6 +142,7 @@ class SubmissionItem:
     video_id: str
     frame_id: int
     answer: Optional[str] = None
+    vqa_answer: Optional[str] = None
     confidence_score: float = 0.0
 
 @dataclass

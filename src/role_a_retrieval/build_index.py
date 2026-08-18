@@ -19,10 +19,10 @@ def calculate_md5(file_path: str) -> str:
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def build_faiss_index(features_dir: str = "data/raw/clip-features-32",
+def build_faiss_index(features_dir: str = "data/raw/siglip2-features",
                      mapping_csv_path: str = "data/processed/global_mapping.csv",
                      output_dir: str = "data/processed/faiss_index",
-                     dimension: int = 512) -> faiss.Index:
+                     dimension: int = 768) -> faiss.Index:
     """
     Builds exact FAISS IndexFlatIP index sequentially using FeatureStore chunked iterator.
     Writes index_manifest.json and records MD5 checksums for artifact locking.
@@ -35,7 +35,7 @@ def build_faiss_index(features_dir: str = "data/raw/clip-features-32",
     feature_store = FeatureStore(features_dir=features_dir, order_json_path=order_json_path)
 
     os.makedirs(output_dir, exist_ok=True)
-    index_path = os.path.join(output_dir, "clip_vit_b32.index")
+    index_path = os.path.join(output_dir, "siglip2.index")
     manifest_path = os.path.join(output_dir, "index_manifest.json")
 
     print(f"--- [FAISS Build] Initializing IndexFlatIP(dim={dimension}) ---")
@@ -56,7 +56,7 @@ def build_faiss_index(features_dir: str = "data/raw/clip-features-32",
 
     # Build and save Index Manifest
     manifest_data = {
-        "model": "clip-ViT-B-32",
+        "model": "siglip2-base-patch16-224",
         "dimension": dimension,
         "metric": "inner_product",
         "normalized": True,
@@ -75,7 +75,7 @@ def build_faiss_index(features_dir: str = "data/raw/clip-features-32",
     print(f"--- [FAISS Build Success] Total vectors indexed: {index.ntotal} ---")
     print(f"Index saved to: {index_path}")
     print(f"Manifest saved to: {manifest_path}")
-    print(f"MD5 Checksum (clip_vit_b32.index): {index_md5}")
+    print(f"MD5 Checksum (siglip2.index): {index_md5}")
     print(f"MD5 Checksum (media.db): {db_md5}")
 
     # Append to docs/decisions.md for audit trail
@@ -83,7 +83,7 @@ def build_faiss_index(features_dir: str = "data/raw/clip-features-32",
     os.makedirs(os.path.dirname(decisions_path), exist_ok=True)
     with open(decisions_path, "a", encoding="utf-8") as f:
         f.write(f"\n## Artifact Lock Checksum ({datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})\n")
-        f.write(f"- `clip_vit_b32.index` ntotal={index.ntotal} MD5: `{index_md5}`\n")
+        f.write(f"- `siglip2.index` ntotal={index.ntotal} MD5: `{index_md5}`\n")
         f.write(f"- `media.db` MD5: `{db_md5}`\n")
 
     return index

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple
 
-def get_sorted_video_ids(features_dir: str = "data/raw/clip-features-32") -> List[str]:
+def get_sorted_video_ids(features_dir: str = "data/raw/siglip2-features") -> List[str]:
     """
     Scans features_dir for .npy files and returns a deterministically sorted list of video IDs.
     """
@@ -14,7 +14,7 @@ def get_sorted_video_ids(features_dir: str = "data/raw/clip-features-32") -> Lis
     video_ids = sorted([os.path.splitext(os.path.basename(f))[0] for f in npy_files])
     return video_ids
 
-def run_sanity_check(features_dir: str = "data/raw/clip-features-32",
+def run_sanity_check(features_dir: str = "data/raw/siglip2-features",
                      map_dir: str = "data/raw/map-keyframes",
                      min_videos: int = 1) -> Dict[str, int]:
     """
@@ -74,7 +74,7 @@ def run_sanity_check(features_dir: str = "data/raw/clip-features-32",
     print(f"--- [Sanity Check] PASS 100%! Tested {len(npy_videos)} videos, total {total_keyframes} keyframes. ---")
     return {"total_videos": len(npy_videos), "total_keyframes": total_keyframes}
 
-def build_global_mapping(features_dir: str = "data/raw/clip-features-32",
+def build_global_mapping(features_dir: str = "data/raw/siglip2-features",
                          map_dir: str = "data/raw/map-keyframes",
                          output_dir: str = "data/processed") -> pd.DataFrame:
     """

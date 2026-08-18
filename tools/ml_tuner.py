@@ -73,14 +73,8 @@ def scoring_function(weights, df):
     """
     w_clip, w_obj, w_spatial = weights
     
-    # Ensure numeric columns
-    for col in ['clip_score', 'obj_score', 'spatial_score']:
-        if col not in df.columns:
-            df[col] = 0.0
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-        
-    # Calculate synthetic fusion score
-    df['synthetic_fusion'] = (w_clip * df['clip_score']) + (w_obj * df['obj_score']) + (w_spatial * df['spatial_score'])
+    # Calculate synthetic fusion score using norm_clip
+    df['synthetic_fusion'] = (w_clip * df['norm_clip']) + (w_obj * df['obj_score']) + (w_spatial * df['spatial_score'])
     
     total_penalty = 0.0
     queries = df['query_id'].unique()
@@ -160,6 +154,22 @@ def run_ml_tuner(output_json="outputs/tuning_results.json"):
     df = load_human_verdicts()
     if df.empty:
         return
+        
+    # Ensure numeric columns
+    for col in ['clip_score', 'obj_score', 'spatial_score']:
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+        
+    # Normalize clip_score per query to match ranking.py behavior
+    def normalize_clip_series(x):
+        xmin = x.min()
+        xmax = x.max()
+        if xmax - xmin == 0:
+            return pd.Series(1.0, index=x.index)
+        return (x - xmin) / (xmax - xmin)
+        
+    df['norm_clip'] = df.groupby('query_id')['clip_score'].transform(normalize_clip_series)
         
     # Summary of verdicts
     counts = df['verdict'].value_counts().to_dict()

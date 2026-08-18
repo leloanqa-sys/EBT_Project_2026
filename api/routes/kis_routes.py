@@ -18,6 +18,10 @@ from pydantic import BaseModel, Field
 
 # ── Resolve project root ──
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "tools"))
+from tools.review_tool import resolve_keyframe_b64
+import base64
 sys.path.insert(0, str(PROJECT_ROOT))
 
 router = APIRouter(tags=["search"])
@@ -93,10 +97,6 @@ def get_frame_image(video_id: str, frame_idx: int):
     Resolve frame image dynamically from .zip or .mp4 files using tools logic.
     """
     try:
-        sys.path.insert(0, str(PROJECT_ROOT / "tools"))
-        from tools.review_tool import resolve_keyframe_b64
-        import base64
-        
         b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(video_id, frame_idx, keyframes_root=str(PROJECT_ROOT / "data" / "raw" / "keyframes"))
         
         if b64_str:

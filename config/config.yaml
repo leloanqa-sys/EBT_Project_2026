@@ -25,9 +25,9 @@ paths:
   traces_dir: "outputs/traces"
 
 models:
-  clip:
-    model_name: "ViT-B/32"
-    pretrained: "openai"
+  siglip2:
+    model_name: "google/siglip2-base-patch16-224"
+    dimension: 768
     device: "cuda"  # fallback to 'cpu' if no GPU available
   faster_rcnn:
     confidence_threshold: 0.3

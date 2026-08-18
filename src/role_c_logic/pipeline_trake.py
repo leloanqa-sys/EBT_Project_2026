@@ -1,11 +1,12 @@
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 from src.pipeline import MVPPipeline
 
 class TRAKEPipeline:
-    def __init__(self, detect_threshold: float = 0.3):
-        # We reuse MVPPipeline as the base retriever for individual sub-events
-        self.kis_pipeline = MVPPipeline(detect_threshold=detect_threshold, top_k_retrieve=300)
+    def __init__(self, detect_threshold: float = 0.3, searcher=None):
+        # We reuse MVPPipeline as the base retriever for individual sub-events.
+        # searcher: inject singleton VectorSearcher from API layer to avoid reloading FAISS on every request.
+        self.kis_pipeline = MVPPipeline(detect_threshold=detect_threshold, top_k_retrieve=300, searcher=searcher)
 
     def run(self, query_id: str, main_query: str, sub_events: List[str], top_k: int = 5, max_time_gap_seconds: float = 30.0) -> Dict:
         """

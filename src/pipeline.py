@@ -12,7 +12,7 @@ Design decisions (self-proposed based on evidence):
    
 2. SPATIAL: Existential semantics (∃ pair satisfies), UNKNOWN=Keep
 
-3. Generator: raw_text -> CLIP (G2 configuration, frozen after G0/G1/G2 audit)
+3. Generator: raw_text -> SigLIP2 (768-dim, google/siglip2-base-patch16-224)
 
 4. Top-K: retrieve 500, return top-100 for submission
 """
@@ -78,7 +78,7 @@ class MVPPipeline:
         """
         Full pipeline for one query.
         Step 1: M1 - Parse NLP -> VisualIR (with Gemini API, cached)
-        Step 2: M2 - CLIP retrieve top-K candidates
+        Step 2: M2 - SigLIP2 retrieve top-K candidates via FAISS
         Step 3: Operators - DETECT / SPATIAL (SQLite, UNKNOWN=Keep)
         Step 4: Return ranked candidates
         """

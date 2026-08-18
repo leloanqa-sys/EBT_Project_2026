@@ -6,7 +6,7 @@ Hệ thống truy xuất khoảnh khắc video đa phương thức (**Multimodal
 
 ## 🌟 Tính Năng Nổi Bật
 
-* ⚡ **Truy xuất Vector Siêu Tốc (FAISS + CLIP ViT-B/32):** Tìm kiếm 177,321 khung hình trong < 10ms.
+* ⚡ **Truy xuất Vector Siêu Tốc (FAISS + SigLIP2):** Tìm kiếm 177,321 khung hình trong < 10ms sử dụng mô hình Google SigLIP2 (768-dim).
 * 🧠 **Biên dịch Ngữ nghĩa Tự nhiên (Gemini NLP Engine):** Tự động bóc tách thực thể, quan hệ không gian, hành động và thuộc tính thành đồ thị `VisualIRGraph`.
 * 🔍 **Lọc Bounding Box & Quan hệ Không gian (SQLite Cache Engine):** Tra cứu 584 nhãn Faster R-CNN trong ~1.7ms/frame với cơ chế Soft Scoring.
 * 🖼️ **Trích xuất ảnh On-Demand (Multi-Strategy Image Resolver):** Hỗ trợ `remotezip` stream dữ liệu thẳng từ Cloud (HTTP Range) siêu tốc mà không cần tốn hàng trăm GB ổ cứng. Đọc trực tiếp ảnh từ file nén `.zip` hoặc trích xuất frame từ video `.mp4`.
@@ -24,7 +24,7 @@ flowchart TD
     RoleB --> IRGraph["Visual IR Graph (Entities, Spatial, Actions)"]
     
     IRGraph --> RoleC_Plan["Role C: Deterministic Planner"]
-    RoleC_Plan --> RoleA["Role A: FAISS + CLIP (Top-500 Retrieval)"]
+    RoleC_Plan --> RoleA["Role A: FAISS + SigLIP2 (Top-500 Retrieval)"]
     
     RoleA --> RoleC_Exec["Role C: Deterministic Executor (SQLite Metadata DB)"]
     RoleC_Exec --> Scoring["Soft Scoring: (w_clip × CLIP + w_obj × OBJ + w_spatial × SPATIAL)"]
@@ -109,7 +109,7 @@ Hệ thống sử dụng cơ chế **Smart On-Demand Data**:
 
 ### 4. Khởi động Web Visualizer & API Server
 ```powershell
-python -m uvicorn api.main:app --reload
+python -m uvicorn api.main:app --reload --reload-dir api --reload-dir src
 ```
 * Mở trình duyệt: **[http://localhost:8000/](http://localhost:8000/)**
 * Tài liệu Swagger API: **[http://localhost:8000/docs](http://localhost:8000/docs)**

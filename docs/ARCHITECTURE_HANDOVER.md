@@ -147,7 +147,7 @@ Mọi mô hình AI nâng cấp ở bản V1 phải vượt qua thử nghiệm đ
 
 ### 1. Khởi chạy Server Bản V0 Baseline
 ```bash
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir api --reload-dir src
 ```
 
 ### 2. Các Lệnh Build Data Offline (Chỉ chạy khi có dữ liệu mới)

@@ -18,13 +18,13 @@ from src.role_a_retrieval.searcher import VectorSearcher
 
 def test_01_sanity_check():
     """Verify 100% sanity check pass on raw dataset."""
-    result = run_sanity_check(features_dir="data/raw/clip-features-32", map_dir="data/raw/map-keyframes")
+    result = run_sanity_check(features_dir="data/raw/siglip2-features", map_dir="data/raw/map-keyframes")
     assert result["total_videos"] > 0
     assert result["total_keyframes"] > 0
 
 def test_02_global_mapping():
     """Verify global_mapping.csv and derived NPZ/JSON artifacts."""
-    df = build_global_mapping(features_dir="data/raw/clip-features-32", map_dir="data/raw/map-keyframes")
+    df = build_global_mapping(features_dir="data/raw/siglip2-features", map_dir="data/raw/map-keyframes")
     assert os.path.exists("data/processed/global_mapping.csv")
     assert os.path.exists("data/processed/video_id_order.json")
     assert os.path.exists("data/processed/video_to_faiss_range.json")
@@ -48,8 +48,8 @@ def test_03_sqlite_db():
 
 def test_04_faiss_index_and_manifest():
     """Verify FAISS index build and index_manifest.json."""
-    index = build_faiss_index(features_dir="data/raw/clip-features-32")
-    assert os.path.exists("data/processed/faiss_index/clip_vit_b32.index")
+    index = build_faiss_index(features_dir="data/raw/siglip2-features")
+    assert os.path.exists("data/processed/faiss_index/siglip2.index")
     assert os.path.exists("data/processed/faiss_index/index_manifest.json")
     
     df = pd.read_csv("data/processed/global_mapping.csv")
@@ -68,7 +68,7 @@ def test_05_vector_sync():
         n_val = int(row["n"]) # 1-indexed line
         
         # Load from .npy
-        npy_path = f"data/raw/clip-features-32/{vid_id}.npy"
+        npy_path = f"data/raw/siglip2-features/{vid_id}.npy"
         feats = np.load(npy_path)
         vec_npy = l2_normalize(feats[n_val - 1 : n_val])
         

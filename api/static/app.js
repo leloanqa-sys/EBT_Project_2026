@@ -96,14 +96,26 @@ document.addEventListener('DOMContentLoaded', () => {
         if (resultsContainer) resultsContainer.style.display = 'none';
         if (resultsGrid) resultsGrid.innerHTML = '';
 
-        const requestBody = {
+        // Fix: chọn đúng endpoint + đúng shape payload theo từng loại query
+        let endpoint = '/api/v1/search/kis';
+        let requestBody = {
             query: query,
             query_type: activeQueryType,
             top_k: 100
         };
 
+        if (activeQueryType === 'QA') {
+            endpoint = '/api/v1/search/qa';
+            requestBody = {
+                query: query,      // TODO: tách ô riêng "Mô tả sự kiện" nếu nhóm quyết định thêm lại ô thứ 2
+                question: query,   // TODO: tách ô riêng "Câu hỏi" — hiện dùng chung 1 ô nên query == question
+                top_k: 5
+            };
+        }
+        // TRAKE tạm thời vẫn gọi /search/kis như cũ (chưa xác nhận schema thật của trake_routes.py)
+
         try {
-            const response = await fetch('/api/v1/search/kis', {
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -116,12 +128,21 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = await response.json();
-            renderResults(data);
+
+            if (activeQueryType === 'QA') {
+                renderQAResult(data);
+            } else {
+                renderResults(data);
+            }
         } catch (error) {
             console.error('Search error:', error);
             if (DEMO_MODE) {
                 console.info('Falling back to demo mode data...');
-                renderResults(getDemoData(query, activeQueryType));
+                if (activeQueryType === 'QA') {
+                    renderQAResult(getDemoQAData(query));
+                } else {
+                    renderResults(getDemoData(query, activeQueryType));
+                }
             } else {
                 showError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau. ' + error.message);
             }
@@ -271,6 +292,83 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Renders QA result — shape khác hẳn KIS/TRAKE: {answer, evidence} thay vì {results}
+     */
+    function renderQAResult(data) {
+        if (!data || !data.evidence || data.evidence.length === 0) {
+            showError('Không tìm thấy bằng chứng phù hợp cho câu hỏi này');
+            return;
+        }
+
+        if (resultsContainer) resultsContainer.style.display = 'block';
+
+        // Chuẩn hóa lại thành shape giống results để tái dùng exportSubmissionCSV() có sẵn
+        window.currentQueryData = {
+            query_id: data.query_id,
+            query_type: 'QA',
+            answer: data.answer,
+            results: data.evidence.map(e => ({
+                ...e,
+                vqa_answer: data.answer,
+                fusion_score: e.clip_score || 0
+            }))
+        };
+
+        if (summaryBar) {
+            summaryBar.innerHTML = `
+                <div class="summary-item">
+                    <span class="summary-label">Câu trả lời:</span>
+                    <span class="summary-value" style="font-weight:bold;">${escapeHtml(data.answer)}</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Thời gian:</span>
+                    <span class="summary-value">${formatTime(data.latency_ms || 0)}</span>
+                </div>
+                <div class="summary-item" style="margin-left: auto;">
+                    <button class="secondary-btn" onclick="exportSubmissionCSV()" style="padding: 4px 12px; font-size: 0.85em; background: #0284c7; color: #fff; border:none; border-radius: 4px; cursor: pointer;">⬇️ Xuất CSV (AIC Format)</button>
+                </div>
+            `;
+        }
+
+        if (parsedInfoContainer) parsedInfoContainer.style.display = 'none';
+
+        if (resultsGrid) {
+            data.evidence.forEach((e, index) => {
+                const card = document.createElement('div');
+                card.className = 'result-card';
+                card.style.animationDelay = `${index * 0.05}s`;
+
+                card.innerHTML = `
+                    <div class="card-image-container">
+                        <span class="rank-badge rank-default">#${e.rank}</span>
+                        <img src="${escapeHtml(e.frame_url)}" alt="Frame ${e.frame_idx}" class="frame-image" data-video="${escapeHtml(e.video_id)}" loading="lazy">
+                    </div>
+                    <div class="card-content">
+                        <div class="card-header">
+                            <h3 class="video-id">${escapeHtml(e.video_id)}</h3>
+                            <span class="frame-idx">Frame #${e.frame_idx}</span>
+                        </div>
+                        <div class="tester-verify-container">
+                            <span class="tester-verify-btn disabled">⏱️ ${escapeHtml(e.timestamp || '00:00')}</span>
+                        </div>
+                        <div class="scores-container">
+                            ${createScoreBar('CLIP', e.clip_score, 1.0, 'clip-bar')}
+                        </div>
+                    </div>
+                `;
+                resultsGrid.appendChild(card);
+            });
+        }
+
+        setTimeout(() => {
+            const progressBars = document.querySelectorAll('.progress-fill');
+            progressBars.forEach(bar => {
+                bar.style.width = bar.dataset.width || '0%';
+            });
+        }, 100);
+    }
+
+    /**
      * Creates HTML for a score bar
      */
     function createScoreBar(label, value, maxValue, colorClass) {
@@ -379,6 +477,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 sub_events: []
             },
             results: results
+        };
+    }
+
+    /**
+     * Generates demo QA data — đúng shape {answer, evidence} cho renderQAResult()
+     */
+    function getDemoQAData(query) {
+        const evidence = [];
+        for (let i = 1; i <= 5; i++) {
+            evidence.push({
+                rank: i,
+                video_id: `L25_V${String(Math.floor(Math.random() * 100)).padStart(3, '0')}`,
+                frame_idx: Math.floor(Math.random() * 30000),
+                timestamp: '00:00',
+                frame_url: 'non_existent_image_to_trigger_fallback.jpg',
+                clip_score: Math.random() * 0.4 + 0.1
+            });
+        }
+        return {
+            query_id: `demo_qa_${Math.random().toString(36).substr(2, 9)}`,
+            answer: '[DEMO] Chưa có kết quả thật — đây là câu trả lời giả lập vì backend chưa sẵn sàng',
+            latency_ms: Math.random() * 500 + 50,
+            evidence: evidence
         };
     }
 });

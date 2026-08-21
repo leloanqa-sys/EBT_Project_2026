@@ -92,8 +92,7 @@ def get_available_gemini_models(api_key: Optional[str] = None) -> List[dict[str,
 
 # Dynamic or active model cascade based on available Gemini models
 GEMINI_MODEL_CASCADE = [
-    "gemini-3.6-flash",        # Latest active standard model
-    "gemini-3.5-flash",        # Stable active fallback
+    "gemini-3.5-flash-lite",   # Latest active lite model
     "gemini-3.1-flash-lite",   # Fast active fallback
 ]
 
@@ -133,8 +132,10 @@ def compile_to_visual_ir(query_id: str, raw_text: str, query_type: str) -> Visua
 
     schema_str = """
 {
-  "clip_query_en": "a girl alone in a red shirt",
+  "clip_query_en": "a girl in a red shirt wearing a straw conical hat",
+  "relaxed_query_en": "a person in bright clothing wearing headwear",
   "entities": [{"id": "e1", "label": "person"}],
+  "relaxed_associations": [{"id": "r1", "label": "person"}],
   "attributes": [{"entity_id": "e1", "name": "shirt_color", "value": "red", "polarity": "POSITIVE"}],
   "relations": [{"source_id": "e1", "target_id": "e2", "relation_type": "behind", "surface_form": "phía sau", "polarity": "POSITIVE"}],
   "events": [{"id": "v1", "action": "argue", "participants": ["e1", "e2"], "polarity": "POSITIVE"}],
@@ -144,64 +145,96 @@ def compile_to_visual_ir(query_id: str, raw_text: str, query_type: str) -> Visua
   "meta": {"confidence": 0.9, "ambiguous_notes": ""},
   "scoring_plan": {
     "context_type": "color_attribute",
-    "w_clip": 1.5,
+    "w_siglip": 1.5,
     "w_obj": 0.2,
     "w_spatial": 0.3,
     "vlm_required": true,
     "vlm_top_k": 10,
-    "clip_k": 500,
+    "siglip_k": 500,
     "rationale": "Query contains color detail 'red shirt' which Faster R-CNN cannot verify directly"
   }
 }
     """
 
+    # Load empirical tuning results if available to provide as reference context to Gemini
+    tuning_context_str = ""
+    _project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    tuning_file = os.path.join(_project_root, "outputs", "tuning_results.json")
+    if os.path.exists(tuning_file):
+        try:
+            with open(tuning_file, "r", encoding="utf-8") as f:
+                tdata = json.load(f)
+                cat_w = tdata.get("category_weights", {})
+                glob_w = tdata.get("global_weights", {})
+                tuning_context_str = f"\nEMPIRICAL BENCHMARK WEIGHTS (Learned from human verdicts):\n- Global default: {glob_w}\n- Category profiles: {cat_w}\n"
+        except Exception:
+            pass
+
     prompt = f"""
-You are a Computer Vision Semantic Compiler and Query Planner for a video-retrieval competition (AIC 2026). Your job is to convert one natural-language query (Vietnamese or English) into the Visual IR Graph schema below, by reasoning through a fixed set of SKILLS in order.
+You are an expert Vision-Language Compiler and Intelligent Query Planner for the AIC 2026 video retrieval system.
+Your job is to convert natural-language queries (Vietnamese or English) into an executable Visual IR Graph schema with DUAL-LAYER RETRIEVAL capabilities (Strict Layer and Relaxed Conceptual Association Layer), and intelligently plan execution weights.
 
-BEFORE YOU START — QUERY TYPE CHECK:
-Identify if the query is: (1) Textual KIS (single scene), (2) Q&A (scene description + factual question), or (3) TRAKE (sequential sub-events).
+DOWNSTREAM SCORING ARCHITECTURE CONTEXT:
+1. Retrieval Backbone: SigLIP2 (768-dim dense semantic embeddings). `norm_siglip` (0.0 to 1.0) captures overall scene semantics, visual concepts, colors, and atmosphere.
+2. Object Detector: Faster R-CNN on 80+ COCO classes. `obj_score` (0.0 to 1.0) measures physical presence of concrete objects (car, person, dog, chair). WARNING: It produces noise for generic tags ('person', 'clothing') and CANNOT detect colors or actions!
+3. Spatial Engine: Bounding-box geometry. `spatial_score` (0.0 to 1.0) checks positional relations (left_of, right_of, above, below, behind, front).
+4. VLM Verifier: Gemini Vision 1.5/2.0. Escalated candidates receive a +5.0 bonus when visual verification confirms complex actions, OCR text, or subtle attributes.
+5. Final Ranking Fusion: Fusion_Score = (w_siglip * norm_siglip) + (w_obj * obj_score) + (w_spatial * spatial_score) + VLM_Bonus.
+{tuning_context_str}
+SKILL 0 — TRACK CLASSIFICATION (query_type):
+Determine if the `raw_text` belongs to one of three tracks:
+- "TRAKE": If the query explicitly describes a sequence of events over time or steps (e.g. "Phân cảnh 1", "Bước 1", "Step 1", "Sau đó").
+- "QA": If the query asks a direct question (e.g. "What is he holding?", "Người đó đang làm gì?", "Trong tay có gì?").
+- "KIS": Otherwise, if it's just describing a visual scene or object.
 
-SKILL 0 — CLIP QUERY TRANSLATION
-Provide a smooth, natural English translation of the visual scene in `clip_query_en`. Remove ALL quotation marks, special characters, and punctuation that might break CLIP tokenization.
-
-SKILL 1 — ENTITY GROUNDING
-Trigger: any noun phrase referring to physical objects/people. Canonical English names.
-
-SKILL 2 — ATTRIBUTE BINDING
-Trigger: colors, clothing, counts, descriptors. Bind explicitly.
-
-SKILL 3 — RELATION EXTRACTION
-Trigger: spatial, possessive, wearing, holding, or containment relations.
-
-SKILL 4 — EVENT EXTRACTION
-Trigger: action verb phrases (e.g. running, arguing).
-
-SKILL 5 — TEMPORAL SEQUENCING
-Trigger: sequential actions, time relation indicators ("before", "after").
-
-SKILL 6 — SPATIAL ORDERING
-Trigger: spatial positions (e.g. leftmost, second from right).
-
-SKILL 7 — NEGATION SWEEP
-Scope negation over attributes/relations/events with NEGATIVE polarity.
-
-SKILL 8 — SCORING PLAN (DYNAMIC WEIGHT MATRIX)
-Based on the query context, define the best execution weights (w_clip, w_obj, w_spatial) to optimize accuracy and prevent object-score bias (e.g., person-detection hubness):
-1. context_type: Choose exactly one of: "default", "color_attribute", "scene_context", "spatial_heavy", "action_event", "trake_sequence".
-2. w_clip (range: [0.0, 2.0]): Scale higher for scenes (1.8) or color/attributes (1.5) where CLIP has superior understanding.
-3. w_obj (range: [0.0, 2.0]): Scale lower for scene_context (0.05) or color_attribute (0.2) to prevent general object tags (e.g. person, clothing) from flooding results. Scale higher (0.6 - 1.0) for concrete physical objects.
-4. w_spatial (range: [0.0, 2.0]): Scale higher (1.2) for spatial relations.
-5. vlm_required: Set to true if the query contains color descriptors, actions, text, or complex relationships that require visual validation.
-6. vlm_top_k (range: [1, 20]): Number of top candidates to escalate (Free key safety: limit to max 10 if vlm_required is true).
-7. clip_k (range: [100, 1000]): Retrievable candidates from CLIP (default 500).
-
-SELF-CHECK BEFORE OUTPUT:
-- All constraints and references must point to existing entity ids.
-- Scoring plan weight ranges are strictly bounded.
+SKILL 1 — TRANSLATION: Produce extremely concise, comma-separated keywords in `clip_query_en`. DO NOT write full descriptive sentences. Extract ONLY the 3-6 most critical visual entities and properties (e.g., "women harvesting pineapples, conical hat, blue boat", "octopus plush toy, girl holding bag"). This is crucial for SigLIP zero-shot matching.
+SKILL 1.5 — DUAL-LAYER SEMANTIC RELAXATION:
+- Produce `relaxed_query_en`: A semantically associated, broader version of the query (e.g. 'conical straw hat' -> 'headwear / hat', 'red shirt' -> 'bright clothing', 'jumping into pool' -> 'outdoor activity water'). DO NOT drop the core visual theme; generalize concepts into broader categories for fallback retrieval.
+- Produce `relaxed_associations`: General entity labels corresponding to relaxed visual categories.
+SKILL 2 — ENTITY GROUNDING: Extract physical entities with canonical English names.
+SKILL 3 — ATTRIBUTE BINDING: Extract colors, counts, clothing, text.
+SKILL 4 — RELATION EXTRACTION: Extract spatial and interaction relations.
+SKILL 5 — EVENT/ACTION: Extract action verbs (running, holding, jumping).
+SKILL 6 — TEMPORAL / SPATIAL CONSTRAINTS: Extract sequence (before/after) and spatial alignment.
+SKILL 7 — SCORING PLAN (INTELLIGENT WEIGHT INTERPOLATION):
+Reason about the query characteristics and dynamically set the weights (range 0.0 to 2.0):
+- context_type: Choose one of: "color_attribute", "scene_context", "spatial_heavy", "action_event", "object_heavy", "default".
+- Reference anchors for your interpolation:
+  * "color_attribute" (e.g. 'người áo xanh'): w_siglip=1.5, w_obj=0.2 (lower obj to avoid person-bias), w_spatial=0.3, vlm_required=true (to verify exact color).
+  * "scene_context" (e.g. 'bãi biển hoàng hôn'): w_siglip=1.8, w_obj=0.05, w_spatial=0.1, vlm_required=false.
+  * "spatial_heavy" (e.g. 'người bên trái ô tô'): w_siglip=0.8, w_obj=0.6, w_spatial=1.2, vlm_required=false.
+  * "action_event" (e.g. 'cầm ly nước uống'): w_siglip=1.6, w_obj=0.3, w_spatial=0.2, vlm_required=true (BBox cannot check action).
+  * "object_heavy" (e.g. '2 chiếc xe máy và 1 con chó'): w_siglip=1.0, w_obj=0.9, w_spatial=0.4, vlm_required=false.
+- Use your reasoning to fine-tune w_siglip, w_obj, w_spatial around these anchors to achieve optimal retrieval accuracy.
+- vlm_required: Set true if the query demands visual verification (color, text/OCR, fine action, facial detail).
+- vlm_top_k: Limit to max 10 to preserve API quota.
+- siglip_k: Candidate retrieval budget (default 500).
 
 OUTPUT CONTRACT:
-Return ONLY the JSON object matching this exact schema — no markdown fences, no prose before or after: 
-{schema_str}
+Return ONLY the JSON object matching this exact schema — no markdown fences, no prose:
+{{
+  "query_type": "string (KIS, QA, or TRAKE)",
+  "clip_query_en": "string",
+  "relaxed_query_en": "string",
+  "relaxed_associations": [{{"id": "e1", "label": "string"}}],
+  "entities": [{{"id": "e1", "label": "string"}}],
+  "attributes": [{{"entity_id": "e1", "name": "color", "value": "red", "polarity": "POSITIVE"}}],
+  "relations": [{{"source_id": "e1", "target_id": "e2", "relation_type": "left_of", "polarity": "POSITIVE"}}],
+  "events": [{{"id": "ev1", "action": "running", "participants": ["e1"], "polarity": "POSITIVE"}}],
+  "temporal_constraints": [],
+  "order_constraints": [],
+  "selection_constraints": [],
+  "scoring_plan": {{
+    "context_type": "string",
+    "w_siglip": 1.0,
+    "w_obj": 0.5,
+    "w_spatial": 0.5,
+    "vlm_required": false,
+    "vlm_top_k": 10,
+    "siglip_k": 500,
+    "rationale": "string"
+  }}
+}}
 
 Query: "{raw_text}"
     """
@@ -217,7 +250,7 @@ Query: "{raw_text}"
 
     max_retries = 3
     for attempt in range(max_retries):
-        model_name = _get_next_model()
+        model_name = GEMINI_MODEL_CASCADE[min(attempt, len(GEMINI_MODEL_CASCADE) - 1)]
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         try:
             # Added verify=False to bypass Windows local SSL issues
@@ -233,6 +266,7 @@ Query: "{raw_text}"
                 parsed = json.loads(raw_text_resp)
                 # Fill missing arrays
                 parsed.setdefault("entities", [])
+                parsed.setdefault("relaxed_associations", [])
                 parsed.setdefault("attributes", [])
                 parsed.setdefault("relations", [])
                 parsed.setdefault("events", [])
@@ -240,10 +274,36 @@ Query: "{raw_text}"
                 parsed.setdefault("order_constraints", [])
                 parsed.setdefault("selection_constraints", [])
                 
+                # Robust constraint sanitization to prevent LLM schema drift errors
+                sanitized_orders = []
+                for o in parsed.get("order_constraints", []):
+                    if isinstance(o, str):
+                        sanitized_orders.append({"target_id": o, "axis": "time", "direction": "ascending"})
+                    elif isinstance(o, dict):
+                        sanitized_orders.append(o)
+                parsed["order_constraints"] = sanitized_orders
+
+                sanitized_temp = []
+                for t in parsed.get("temporal_constraints", []):
+                    if isinstance(t, dict):
+                        source = t.get("source_id") or t.get("event_before") or t.get("event_id") or t.get("before") or ""
+                        target = t.get("target_id") or t.get("event_after") or t.get("target_event_id") or t.get("after") or ""
+                        rel = t.get("relation") or "before"
+                        sanitized_temp.append({
+                            "source_id": str(source),
+                            "target_id": str(target),
+                            "relation": str(rel)
+                        })
+                parsed["temporal_constraints"] = sanitized_temp
+                
                 parsed["query_id"] = query_id
                 parsed["raw_text"] = raw_text
                 parsed.setdefault("clip_query_en", "")
-                parsed["query_type"] = query_type
+                parsed.setdefault("relaxed_query_en", "")
+                if query_type and query_type != "AUTO":
+                    parsed["query_type"] = query_type
+                else:
+                    parsed.setdefault("query_type", "KIS")
                 parsed["ir_version"] = "1.0"
                 
                 ir_graph = VisualIRGraph(**parsed)

@@ -31,7 +31,7 @@ class TestFeedbackAPI(unittest.TestCase):
             "video_id": "V1",
             "frame_idx": 100,
             "verdict": 1,
-            "clip_score": 0.87,
+            "siglip_score": 0.87,
             "obj_score": 0.65,
             "spatial_score": 0.0,
             "has_target_objects": True
@@ -63,7 +63,7 @@ class TestFeedbackAPI(unittest.TestCase):
             "video_id": "V1",
             "frame_idx": 100,
             "verdict": 1,
-            "clip_score": 0.87,
+            "siglip_score": 0.87,
         }
         
         response = self.client.post("/api/v1/feedback", json=payload_missing)

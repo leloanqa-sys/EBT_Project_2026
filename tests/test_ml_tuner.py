@@ -27,18 +27,18 @@ class TestMLTuner(unittest.TestCase):
         
         for i in range(50):
             # random scores
-            clip_score = np.random.rand()
+            siglip_score = np.random.rand()
             spatial_score = np.random.rand()
             
             # compute true fusion score using our secret weights
-            true_score = (target_w_clip * clip_score) + (target_w_spatial * spatial_score)
+            true_score = (target_w_clip * siglip_score) + (target_w_spatial * spatial_score)
             
             # if the score is in the top 50% for this "query", we call it a MATCH
             data.append({
                 "query_id": f"q_{i//5}", # 5 frames per query
                 "video_id": f"v_{i}",
                 "frame_idx": i,
-                "clip_score": clip_score,
+                "siglip_score": siglip_score,
                 "obj_score": 0.0, # testing without objects
                 "spatial_score": spatial_score,
                 "has_target_objects": False,
@@ -68,7 +68,7 @@ class TestMLTuner(unittest.TestCase):
 
     def test_agent3_tuner_empty_csv(self):
         """Test Case 3.3: Empty CSV exits gracefully."""
-        pd.DataFrame(columns=["query_id","video_id","frame_idx","verdict","clip_score","obj_score","spatial_score","has_target_objects"]).to_csv(self.dummy_csv, index=False)
+        pd.DataFrame(columns=["query_id","video_id","frame_idx","verdict","siglip_score","obj_score","spatial_score","has_target_objects"]).to_csv(self.dummy_csv, index=False)
         # Should not crash
         self.assertTrue(os.path.exists(self.dummy_csv))
 

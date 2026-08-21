@@ -24,9 +24,9 @@ class TestRoleCLogic(unittest.TestCase):
 
     def test_representative_immutability(self):
         """Verify _representative uses dataclasses.replace and does NOT mutate original object."""
-        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, clip_score=0.5, fusion_score=0.5)
-        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, clip_score=0.9, fusion_score=0.9)
-        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=30, clip_score=0.7, fusion_score=0.7)
+        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, siglip_score=0.5, fusion_score=0.5)
+        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, siglip_score=0.9, fusion_score=0.9)
+        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=30, siglip_score=0.7, fusion_score=0.7)
         
         cluster = [c1, c2, c3]
         rep = _representative(cluster)
@@ -34,10 +34,10 @@ class TestRoleCLogic(unittest.TestCase):
         # Best score in cluster is c2 (0.9), median frame_idx is c2 (20)
         self.assertEqual(rep.faiss_id, 2)
         self.assertEqual(rep.frame_idx, 20)
-        self.assertEqual(rep.clip_score, 0.9)
+        self.assertEqual(rep.siglip_score, 0.9)
         
         # Verify original c2 was NOT mutated if median had differed
-        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=100, clip_score=0.95, fusion_score=0.95)
+        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=100, siglip_score=0.95, fusion_score=0.95)
         cluster2 = [c1, c2, c3, c4]  # median is index len//2 = 2 -> c3.frame_idx = 30
         rep2 = _representative(cluster2)
         
@@ -47,10 +47,10 @@ class TestRoleCLogic(unittest.TestCase):
 
     def test_cluster_by_event_gap(self):
         """Verify cluster_by_event groups frames within gap_threshold from cluster[0]."""
-        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, clip_score=0.8)
-        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, clip_score=0.6)  # 20 - 10 = 10 <= 15 -> same cluster
-        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=25, clip_score=0.7)  # 25 - 10 = 15 <= 15 -> same cluster
-        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=30, clip_score=0.9)  # 30 - 10 = 20 > 15  -> new cluster
+        c1 = CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, siglip_score=0.8)
+        c2 = CandidateFrame(faiss_id=2, video_id="V1", frame_idx=20, siglip_score=0.6)  # 20 - 10 = 10 <= 15 -> same cluster
+        c3 = CandidateFrame(faiss_id=3, video_id="V1", frame_idx=25, siglip_score=0.7)  # 25 - 10 = 15 <= 15 -> same cluster
+        c4 = CandidateFrame(faiss_id=4, video_id="V1", frame_idx=30, siglip_score=0.9)  # 30 - 10 = 20 > 15  -> new cluster
         
         candidates = [c1, c2, c3, c4]
         representatives = cluster_by_event(candidates, gap_threshold=15)
@@ -64,13 +64,13 @@ class TestRoleCLogic(unittest.TestCase):
     def test_rank_5budget_unique_videos(self):
         """Verify ranks 2-5 select candidates from 4 unique video_ids."""
         candidates = [
-            CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, clip_score=0.95), # Top 1
-            CandidateFrame(faiss_id=2, video_id="V1", frame_idx=50, clip_score=0.90), # V1 (same as top 1)
-            CandidateFrame(faiss_id=3, video_id="V2", frame_idx=15, clip_score=0.85), # V2
-            CandidateFrame(faiss_id=4, video_id="V2", frame_idx=40, clip_score=0.80), # V2 (same as V2)
-            CandidateFrame(faiss_id=5, video_id="V3", frame_idx=10, clip_score=0.75), # V3
-            CandidateFrame(faiss_id=6, video_id="V4", frame_idx=12, clip_score=0.70), # V4
-            CandidateFrame(faiss_id=7, video_id="V5", frame_idx=18, clip_score=0.65), # V5
+            CandidateFrame(faiss_id=1, video_id="V1", frame_idx=10, siglip_score=0.95), # Top 1
+            CandidateFrame(faiss_id=2, video_id="V1", frame_idx=50, siglip_score=0.90), # V1 (same as top 1)
+            CandidateFrame(faiss_id=3, video_id="V2", frame_idx=15, siglip_score=0.85), # V2
+            CandidateFrame(faiss_id=4, video_id="V2", frame_idx=40, siglip_score=0.80), # V2 (same as V2)
+            CandidateFrame(faiss_id=5, video_id="V3", frame_idx=10, siglip_score=0.75), # V3
+            CandidateFrame(faiss_id=6, video_id="V4", frame_idx=12, siglip_score=0.70), # V4
+            CandidateFrame(faiss_id=7, video_id="V5", frame_idx=18, siglip_score=0.65), # V5
         ]
         
         ranked_items = rank_5budget(candidates, strategy="diversify")

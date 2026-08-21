@@ -19,10 +19,11 @@ router = APIRouter(tags=["feedback"])
 
 class FeedbackRequest(BaseModel):
     query_id: str = Field(..., description="Unique ID of the query")
+    query_text: Optional[str] = Field(default="", description="Original query text for categorization")
     video_id: str = Field(..., description="Video ID")
     frame_idx: int = Field(..., description="Frame index")
     verdict: Union[str, int] = Field(..., description="Verdict: 'MATCH' (1), 'UNCERTAIN' (2), 'MISMATCH' (0)")
-    clip_score: float = Field(default=0.0, description="CLIP score")
+    siglip_score: float = Field(default=0.0, description="SigLIP score")
     obj_score: float = Field(default=0.0, description="Object score")
     spatial_score: float = Field(default=0.0, description="Spatial score")
     fusion_score: float = Field(default=0.0, description="Fusion score")
@@ -52,16 +53,16 @@ async def submit_feedback(req: FeedbackRequest):
         with open(q_file, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             if not q_exists:
-                writer.writerow(["query_id", "video_id", "frame_id", "verdict", "clip_score", "obj_score", "spatial_score", "fusion_score"])
-            writer.writerow([req.query_id, req.video_id, req.frame_idx, verdict_clean, f"{req.clip_score:.4f}", f"{req.obj_score:.2f}", f"{req.spatial_score:.2f}", f"{req.fusion_score:.4f}"])
+                writer.writerow(["query_id", "video_id", "frame_id", "verdict", "siglip_score", "obj_score", "spatial_score", "fusion_score", "query_text"])
+            writer.writerow([req.query_id, req.video_id, req.frame_idx, verdict_clean, f"{req.siglip_score:.4f}", f"{req.obj_score:.2f}", f"{req.spatial_score:.2f}", f"{req.fusion_score:.4f}", req.query_text or ""])
             
         # 2. Append to all ground truth file
         all_exists = ALL_GT_FILE.exists()
         with open(ALL_GT_FILE, mode="a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             if not all_exists:
-                writer.writerow(["query_id", "video_id", "frame_id", "verdict", "clip_score", "obj_score", "spatial_score", "fusion_score"])
-            writer.writerow([req.query_id, req.video_id, req.frame_idx, verdict_clean, f"{req.clip_score:.4f}", f"{req.obj_score:.2f}", f"{req.spatial_score:.2f}", f"{req.fusion_score:.4f}"])
+                writer.writerow(["query_id", "video_id", "frame_id", "verdict", "siglip_score", "obj_score", "spatial_score", "fusion_score", "query_text"])
+            writer.writerow([req.query_id, req.video_id, req.frame_idx, verdict_clean, f"{req.siglip_score:.4f}", f"{req.obj_score:.2f}", f"{req.spatial_score:.2f}", f"{req.fusion_score:.4f}", req.query_text or ""])
             
         return {"status": "success", "message": f"Verdict '{verdict_clean}' saved successfully", "verdict": verdict_clean}
     except Exception as e:

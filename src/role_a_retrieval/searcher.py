@@ -9,6 +9,22 @@ from typing import List, Optional, Union
 # Suppress benign HuggingFace Hub symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
+# Force offline mode to prevent SSL connection hanging on Windows (assuming model is cached)
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+import requests
+import warnings
+import urllib3
+warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
+
+# Monkey-patch requests to disable SSL verification globally for HuggingFace Hub
+_orig_request = requests.Session.request
+def _unverified_request(self, method, url, *args, **kwargs):
+    kwargs['verify'] = False
+    return _orig_request(self, method, url, *args, **kwargs)
+requests.Session.request = _unverified_request
+
 from src.common.schemas import CandidateFrame
 from src.role_a_retrieval.feature_store import l2_normalize
 
@@ -108,7 +124,7 @@ class VectorSearcher:
         import torch
         norm_query = text_query.strip().lower()
         # Đổi key cache sang siglip2 để không bị xung đột với cache cũ của CLIP
-        cache_key = hashlib.sha256(f"siglip2-base-patch16-224::{norm_query}".encode("utf-8")).hexdigest()
+        cache_key = hashlib.sha256(f"siglip2-base-patch16-224::full-query-v2::{norm_query}".encode("utf-8")).hexdigest()
         cache_file = os.path.join(self.cache_dir, f"{cache_key}.npy")
 
         if os.path.exists(cache_file):
@@ -116,7 +132,7 @@ class VectorSearcher:
 
         self._init_siglip_text_encoder()
 
-        inputs = self._processor(text=[norm_query], padding="max_length", return_tensors="pt")
+        inputs = self._processor(text=[norm_query], padding="max_length", max_length=64, truncation=True, return_tensors="pt")
         inputs = {k: v.to(self._device) for k, v in inputs.items()}
 
         with torch.no_grad():
@@ -198,7 +214,7 @@ class VectorSearcher:
                     frame_idx=f_idx,
                     pts_time=p_time,
                     fps=fps_val,
-                    clip_score=float(score)
+                    siglip_score=float(score)
                 ))
 
             all_batch_candidates.append(candidates)

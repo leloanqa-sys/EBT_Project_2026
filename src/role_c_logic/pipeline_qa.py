@@ -56,7 +56,7 @@ class QAPipeline:
             vid = best_candidate.video_id
             fidx = best_candidate.frame_idx
             
-            b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(vid, fidx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"))
+            b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(vid, fidx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"), allow_remote=True)
             if b64_str:
                 image_bytes = base64.b64decode(b64_str.split(",")[1])
                         

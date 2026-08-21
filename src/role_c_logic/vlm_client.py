@@ -100,7 +100,11 @@ class GeminiVisionClient:
         }
 
         for attempt in range(3):
-            model_name = self._get_next_model()
+            if self.total_api_calls >= 5000:
+                print(f"[API COST GUARD] Cảnh báo: Vượt quá giới hạn 5000 lượt gọi API. Bỏ qua request.")
+                return ""
+                
+            model_name = self.GEMINI_CASCADE[min(attempt, len(self.GEMINI_CASCADE) - 1)]
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.api_key}"
             try:
                 self.total_api_calls += 1
@@ -121,7 +125,9 @@ class GeminiVisionClient:
         Returns a list of dicts: {"match": bool, "answer": Optional[str]} in the same order.
         """
         results = [{"match": False, "answer": None} for _ in range(len(candidates))]
-        
+        if not self.api_key:
+            return results
+            
         keyframes_root = os.path.join(PROJECT_ROOT, "data", "raw", "keyframes")
         
         uncached_indices = []
@@ -132,7 +138,7 @@ class GeminiVisionClient:
             if cached_res is not None:
                 results[idx] = cached_res
             else:
-                b64_str, _, _ = resolve_keyframe_b64(candidate.video_id, candidate.frame_idx, keyframes_root=keyframes_root)
+                b64_str, _, _ = resolve_keyframe_b64(candidate.video_id, candidate.frame_idx, keyframes_root=keyframes_root, allow_remote=True)
                 if b64_str:
                     uncached_indices.append(idx)
                     b64_images_to_send.append(b64_str)

@@ -57,7 +57,7 @@ async def search_trake(req: TRAKERequest):
                     "frame_idx": c_obj.frame_idx,
                     "timestamp": pts_str,
                     "frame_url": f"/api/v1/image/{c_obj.video_id}/{c_obj.frame_idx}",
-                    "clip_score": round(c_obj.clip_score, 4)
+                    "siglip_score": round(c_obj.siglip_score, 4)
                 })
                 
             seqs_out.append({

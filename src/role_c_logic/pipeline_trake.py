@@ -29,41 +29,48 @@ class TRAKEPipeline:
             # Limit to top 300 per event to increase intersection chances
             event_candidates.append(res.candidates[:300])
             
-        # 2. Group by Video ID
-        # Only consider videos that appear in ALL sub-events' candidate lists (or at least many of them)
-        # For strict TRAKE, it must appear in all.
-        video_sets = []
+        # 2. Group by Video ID and rank by coverage
+        from collections import Counter
+        all_vids_counter = Counter()
         for cands in event_candidates:
             vset = set(c.video_id for c in cands)
-            video_sets.append(vset)
-            
-        # Intersection of videos
-        common_videos = set.intersection(*video_sets) if video_sets else set()
+            for vid in vset:
+                all_vids_counter[vid] += 1
+                
+        # First try to find videos containing ALL events (100% coverage)
+        full_coverage_videos = {vid for vid, count in all_vids_counter.items() if count == N}
+        if full_coverage_videos:
+            candidate_videos = full_coverage_videos
+        else:
+            min_required_events = max(1, int(N * 0.6))
+            candidate_videos = {vid for vid, count in all_vids_counter.items() if count >= min_required_events}
         
-        if not common_videos:
+        if not candidate_videos:
             return {"sequences": [], "latency_ms": (time.time() - start_time) * 1000}
             
         # 3. Dynamic Programming for Alignment
         # For each video, find the optimal strictly increasing sequence of timestamps
         best_sequences = []
         
-        for vid in common_videos:
+        for vid in candidate_videos:
+            coverage_count = all_vids_counter[vid]
+            coverage_bonus = (coverage_count / N) * 10.0
+            
             # Extract frames for this video per event, sorted by pts_time
             V_cands = []
             for cands in event_candidates:
                 frames = [c for c in cands if c.video_id == vid]
                 frames.sort(key=lambda x: x.pts_time)
+                if not frames:
+                    # If an event is missing in this video, create dummy candidate from previous event
+                    frames = [CandidateFrame(faiss_id=-1, video_id=vid, frame_idx=0, siglip_score=0.0)]
                 V_cands.append(frames)
                 
-            # DP State: dp[i][j] = max score for prefix of length i ending at frame j of event i
-            # where V_cands[i][j]
-            # Since V_cands[i] can have multiple frames, we track max score and backpointer
             dp = [[] for _ in range(N)]
             backpointers = [[] for _ in range(N)]
             
-            # Helper to get fusion_score safely (fallback to clip_score if not computed)
             def _get_fscore(cf):
-                return getattr(cf, 'fusion_score', cf.clip_score)
+                return getattr(cf, 'fusion_score', cf.siglip_score)
                 
             # Init dp for event 0
             for j, f0 in enumerate(V_cands[0]):
@@ -79,12 +86,10 @@ class TRAKEPipeline:
                     
                     fi_score = _get_fscore(fi)
                     for k, fk in enumerate(V_cands[i-1]):
-                        # Constraint: Time must be increasing, allowing same-frame events
                         time_diff = fi.pts_time - fk.pts_time
                         if 0 <= time_diff <= max_time_gap_seconds:
                             score = dp[i-1][k] + fi_score
-                            # Optional: apply penalty for large time gaps
-                            penalty = 0.05 * (time_diff / max_time_gap_seconds)
+                            penalty = 0.02 * (time_diff / max_time_gap_seconds)
                             score -= penalty
                             
                             if score > max_prev_score:
@@ -99,7 +104,6 @@ class TRAKEPipeline:
                     break
                     
             if valid_sequence_exists:
-                # Find best end frame
                 best_end_idx = -1
                 max_total_score = -1.0
                 for j, score in enumerate(dp[N-1]):
@@ -108,7 +112,6 @@ class TRAKEPipeline:
                         best_end_idx = j
                         
                 if best_end_idx != -1:
-                    # Backtrack to build the sequence
                     seq = []
                     curr_idx = best_end_idx
                     for i in range(N-1, -1, -1):
@@ -116,16 +119,18 @@ class TRAKEPipeline:
                         curr_idx = backpointers[i][curr_idx]
                     seq.reverse()
                     
-                    avg_score = max_total_score / N
+                    final_seq_score = coverage_bonus + (max_total_score / N)
                     best_sequences.append({
                         "video_id": vid,
-                        "avg_score": avg_score,
+                        "avg_score": round(final_seq_score, 4),
                         "frames": seq
                     })
                     
         # 4. Sort and return Top-K sequences
         best_sequences.sort(key=lambda x: x["avg_score"], reverse=True)
         return {
+            "query_id": query_id,
             "sequences": best_sequences[:top_k],
             "latency_ms": (time.time() - start_time) * 1000
         }
+

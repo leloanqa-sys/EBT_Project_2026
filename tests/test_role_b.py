@@ -62,7 +62,7 @@ class TestRoleBNLP(unittest.TestCase):
             video_id="L01_V001",
             frame_idx=125,
             faiss_id=4502,
-            clip_score=0.85
+            siglip_score=0.85
         )
         setattr(frame, "fusion_score", 0.78)
         self.assertEqual(frame.faiss_id, 4502)
@@ -74,7 +74,7 @@ class TestRoleBNLP(unittest.TestCase):
         self.assertIsNone(ans.confidence)
 
     def test_compute_fusion_score(self):
-        score = compute_fusion_score(clip_score=0.8, obj_score=0.5, meta_score=0.0)
+        score = compute_fusion_score(siglip_score=0.8, obj_score=0.5, meta_score=0.0)
         self.assertEqual(score, 0.72)
         
     def test_calculate_object_match_score(self):

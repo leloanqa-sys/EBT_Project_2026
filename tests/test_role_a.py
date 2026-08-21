@@ -85,14 +85,14 @@ def test_06_searcher_interface_and_batch():
     candidates = searcher.search_by_text("a photo of a person", top_k=10)
     assert len(candidates) > 0
     assert isinstance(candidates[0], CandidateFrame)
-    assert candidates[0].clip_score >= -1.0 and candidates[0].clip_score <= 1.0
+    assert candidates[0].siglip_score >= -1.0 and candidates[0].siglip_score <= 1.0
 
     # 2. Vector Search (Self search test)
     sample_vec = searcher.index.reconstruct(0).reshape(1, -1)
     vec_candidates = searcher.search_by_vector(sample_vec, top_k=5)
     assert len(vec_candidates) > 0
     assert vec_candidates[0].faiss_id == 0
-    assert np.isclose(vec_candidates[0].clip_score, 1.0, atol=1e-4)
+    assert np.isclose(vec_candidates[0].siglip_score, 1.0, atol=1e-4)
 
     # 3. Batch Search
     batch_vecs = np.vstack([

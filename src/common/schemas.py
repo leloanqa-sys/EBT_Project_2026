@@ -45,18 +45,24 @@ class Event(BaseModel):
     polarity: Polarity = Polarity.POSITIVE
 
 class TemporalConstraint(BaseModel):
-    source_id: str
-    target_id: str
-    relation: str
+    source_id: str = ""
+    target_id: str = ""
+    relation: str = "before"
+    event_before: Optional[str] = None
+    event_after: Optional[str] = None
+    event_id: Optional[str] = None
+    target_event_id: Optional[str] = None
 
 class OrderConstraint(BaseModel):
-    target_id: str
-    axis: str
-    direction: str
+    target_id: str = ""
+    axis: str = "time"
+    direction: str = "ascending"
+    before: Optional[str] = None
+    after: Optional[str] = None
 
 class SelectionConstraint(BaseModel):
-    target_id: str
-    rank: int
+    target_id: str = ""
+    rank: int = 1
 
 class MetaInfo(BaseModel):
     confidence: float = 1.0
@@ -67,13 +73,15 @@ class ScoringPlan(BaseModel):
     Scoring plan created by the Gemini Planner to dynamically shift weights
     based on query context, protecting API quota and preventing object-score bias.
     """
-    context_type: str = Field(default="default", description="One of: default, color_attribute, scene_context, spatial_heavy, action_event, trake_sequence")
-    w_clip: float = Field(default=1.0, ge=0.0, le=2.0)
+    context_type: str = Field(default="default", description="One of: default, color_attribute, scene_context, spatial_heavy, action_event, object_heavy, trake_sequence")
+    w_siglip: float = Field(default=1.0, ge=0.0, le=2.0)
+    w_clip: float = Field(default=1.0, ge=0.0, le=2.0)  # Legacy alias
     w_obj: float = Field(default=0.5, ge=0.0, le=2.0)
     w_spatial: float = Field(default=0.5, ge=0.0, le=2.0)
     vlm_required: bool = False
     vlm_top_k: int = Field(default=10, ge=1, le=50)
-    clip_k: int = Field(default=500, ge=100, le=1000)
+    siglip_k: int = Field(default=500, ge=100, le=1000)
+    clip_k: int = Field(default=500, ge=100, le=1000)  # Legacy alias
     rationale: str = ""
 
 class VisualIRGraph(BaseModel):
@@ -85,8 +93,10 @@ class VisualIRGraph(BaseModel):
     query_id: str
     raw_text: str
     clip_query_en: str = ""
+    relaxed_query_en: str = ""
     query_type: str
     entities: List[Entity] = Field(default_factory=list)
+    relaxed_associations: List[Entity] = Field(default_factory=list)
     attributes: List[Attribute] = Field(default_factory=list)
     relations: List[Relation] = Field(default_factory=list)
     events: List[Event] = Field(default_factory=list)
@@ -108,7 +118,7 @@ class CandidateFrame:
     frame_idx: int
     pts_time: float = 0.0
     fps: float = 0.0
-    clip_score: float = 0.0
+    siglip_score: float = 0.0
     
     # ML Soft Scoring Fields
     obj_score: float = 0.0

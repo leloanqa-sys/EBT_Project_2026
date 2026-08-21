@@ -146,6 +146,27 @@ def optimize_weights_numpy(loss_fn, init_weights, df, bounds=(0.0, 4.0), step=0.
                     
     return best_weights, best_loss
 
+def classify_query_context(query_text: str) -> str:
+    """Classifies a query into a domain category for specialized weight tuning."""
+    if not query_text:
+        return "general_scene"
+    t = query_text.lower()
+    
+    color_keywords = ["đỏ", "xanh", "vàng", "trắng", "đen", "tím", "cam", "hồng", "nâu", "xám", "áo", "quần", "mũ", "nón", "red", "blue", "green", "yellow", "black", "white", "shirt", "pants", "hat", "dress"]
+    spatial_keywords = ["bên trái", "bên phải", "phía sau", "đằng trước", "ở giữa", "cạnh", "kế bên", "gần", "trên", "dưới", "left", "right", "behind", "front", "middle", "next to", "above", "below"]
+    action_keywords = ["chạy", "nhảy", "đi bộ", "cầm", "nắm", "lái xe", "ăn", "uống", "nói chuyện", "đá", "ném", "chơi", "ngã", "ôm", "hát", "run", "walk", "jump", "drive", "eat", "drink", "talk", "kick", "throw", "play", "fall", "hold"]
+    object_heavy_keywords = ["ô tô", "xe hơi", "xe máy", "xe đạp", "con chó", "con mèo", "cái bàn", "cái ghế", "người", "car", "motorcycle", "bicycle", "dog", "cat", "table", "chair", "person"]
+    
+    if any(k in t for k in color_keywords):
+        return "color_attribute"
+    if any(k in t for k in spatial_keywords):
+        return "spatial_heavy"
+    if any(k in t for k in action_keywords):
+        return "action_event"
+    if any(k in t for k in object_heavy_keywords):
+        return "object_heavy"
+    return "general_scene"
+
 def run_ml_tuner(output_json="outputs/tuning_results.json"):
     print("=" * 60)
     print("🤖 ML TUNER - TỐI ƯU HÓA TRỌNG SỐ FUSION DỰA TRÊN HUMAN VERDICTS")
@@ -155,71 +176,101 @@ def run_ml_tuner(output_json="outputs/tuning_results.json"):
     if df.empty:
         return
         
-    # Ensure numeric columns
-    for col in ['clip_score', 'obj_score', 'spatial_score']:
+    # Support both siglip_score and legacy clip_score
+    if 'siglip_score' not in df.columns and 'clip_score' in df.columns:
+        df['siglip_score'] = df['clip_score']
+    elif 'siglip_score' not in df.columns:
+        df['siglip_score'] = 0.0
+        
+    for col in ['siglip_score', 'obj_score', 'spatial_score']:
         if col not in df.columns:
             df[col] = 0.0
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
         
-    # Normalize clip_score per query to match ranking.py behavior
-    def normalize_clip_series(x):
+    if 'query_text' not in df.columns:
+        df['query_text'] = ""
+    df['query_text'] = df['query_text'].fillna("")
+    
+    # Classify each query
+    df['context_type'] = df['query_text'].apply(classify_query_context)
+        
+    # Normalize siglip_score per query to match ranking.py behavior
+    def normalize_siglip_series(x):
         xmin = x.min()
         xmax = x.max()
         if xmax - xmin == 0:
             return pd.Series(1.0, index=x.index)
         return (x - xmin) / (xmax - xmin)
         
-    df['norm_clip'] = df.groupby('query_id')['clip_score'].transform(normalize_clip_series)
+    df['norm_clip'] = df.groupby('query_id')['siglip_score'].transform(normalize_siglip_series)
         
     # Summary of verdicts
     counts = df['verdict'].value_counts().to_dict()
     print("📊 Thống kê Ground Truth hiện có:")
-    print(f"   - Khớp (MATCH)        : {counts.get('MATCH', 0)}")
+    print(f"   - Khớp (MATCH)          : {counts.get('MATCH', 0)}")
     print(f"   - Không chắc (UNCERTAIN): {counts.get('UNCERTAIN', 0)}")
-    print(f"   - Sai (MISMATCH)      : {counts.get('MISMATCH', 0)}")
-    print(f"   - Chưa chấm (UNRATED) : {counts.get('UNRATED', 0)}")
+    print(f"   - Sai (MISMATCH)        : {counts.get('MISMATCH', 0)}")
+    print(f"   - Phân loại ngữ cảnh    : {df['context_type'].value_counts().to_dict()}")
     
-    # Baseline with current default weights: [1.0, 0.5, 0.5]
+    # 1. Global Optimization
     init_weights = [1.0, 0.5, 0.5]
     baseline_loss = scoring_function(init_weights, df.copy())
-    print(f"\n📉 Mức phạt trước tối ưu (Baseline Loss với [1.0, 0.5, 0.5]): {baseline_loss:.4f}")
+    print(f"\n📉 Mức phạt toàn cục trước tối ưu (Baseline Loss): {baseline_loss:.4f}")
     
     bounds = (0.0, 4.0)
-    print("⏳ Đang tính toán tìm kiếm điểm trọng số tối ưu...")
+    print("⏳ Đang tối ưu hóa trọng số toàn cục (Global Weights)...")
     
     if HAS_SCIPY:
-        res = minimize(
-            scoring_function, 
-            init_weights, 
-            args=(df.copy(),), 
-            method='L-BFGS-B', 
-            bounds=[(bounds[0], bounds[1])] * 3
-        )
-        opt_w_clip, opt_w_obj, opt_w_spatial = res.x
+        res = minimize(scoring_function, init_weights, args=(df.copy(),), method='L-BFGS-B', bounds=[(bounds[0], bounds[1])] * 3)
+        opt_w_siglip, opt_w_obj, opt_w_spatial = res.x
         opt_loss = res.fun
     else:
         best_w, opt_loss = optimize_weights_numpy(scoring_function, init_weights, df.copy(), bounds=bounds)
-        opt_w_clip, opt_w_obj, opt_w_spatial = best_w
+        opt_w_siglip, opt_w_obj, opt_w_spatial = best_w
     
-    print("\n" + "=" * 60)
-    print("✅ TỐI ƯU HÓA HOÀN TẤT!")
-    print(f"📉 Mức phạt tối ưu đạt được (Optimal Loss): {opt_loss:.4f} (Giảm: {baseline_loss - opt_loss:.4f})")
-    print("\n🎯 BỘ TRỌNG SỐ ĐỀ XUẤT (Candidate Optimal Hyperparameters):")
-    print(f"   - w_clip    = {opt_w_clip:.4f}")
+    print("\n🎯 TRỌNG SỐ TOÀN CỤC ĐỀ XUẤT (Global Optimal Hyperparameters):")
+    print(f"   - w_siglip  = {opt_w_siglip:.4f}")
     print(f"   - w_obj     = {opt_w_obj:.4f}")
     print(f"   - w_spatial = {opt_w_spatial:.4f}")
-    print("=" * 60)
     
-    # Save results to JSON file for benchmarking / later use
+    # 2. Per-Category Optimization
+    category_weights = {}
+    print("\n🔬 TỐI ƯU HÓA CHI TIẾT THEO TỪNG DẠNG TRUY VẤN (Per-Category Tuning):")
+    for ctype, cdf in df.groupby('context_type'):
+        if len(cdf['query_id'].unique()) < 2:
+            print(f"   ℹ️ Ngữ cảnh '{ctype}' có ít hơn 2 truy vấn, dùng fallback toàn cục.")
+            category_weights[ctype] = {
+                "w_siglip": round(float(opt_w_siglip), 4),
+                "w_obj": round(float(opt_w_obj), 4),
+                "w_spatial": round(float(opt_w_spatial), 4)
+            }
+            continue
+            
+        if HAS_SCIPY:
+            cres = minimize(scoring_function, init_weights, args=(cdf.copy(),), method='L-BFGS-B', bounds=[(bounds[0], bounds[1])] * 3)
+            cw_siglip, cw_obj, cw_spatial = cres.x
+        else:
+            cbest_w, _ = optimize_weights_numpy(scoring_function, init_weights, cdf.copy(), bounds=bounds)
+            cw_siglip, cw_obj, cw_spatial = cbest_w
+            
+        print(f"   ✨ Ngữ cảnh [{ctype}]: w_siglip={cw_siglip:.2f}, w_obj={cw_obj:.2f}, w_spatial={cw_spatial:.2f}")
+        category_weights[ctype] = {
+            "w_siglip": round(float(cw_siglip), 4),
+            "w_obj": round(float(cw_obj), 4),
+            "w_spatial": round(float(cw_spatial), 4)
+        }
+        
+    # Save results to JSON file
     os.makedirs(os.path.dirname(output_json), exist_ok=True)
     results_payload = {
         "baseline_loss": float(baseline_loss),
         "optimal_loss": float(opt_loss),
-        "optimal_weights": {
-            "w_clip": round(float(opt_w_clip), 4),
+        "global_weights": {
+            "w_siglip": round(float(opt_w_siglip), 4),
             "w_obj": round(float(opt_w_obj), 4),
             "w_spatial": round(float(opt_w_spatial), 4)
         },
+        "category_weights": category_weights,
         "verdict_counts": {k: int(v) for k, v in counts.items()},
         "total_evaluated_frames": len(df)
     }
@@ -227,8 +278,7 @@ def run_ml_tuner(output_json="outputs/tuning_results.json"):
     with open(output_json, "w", encoding="utf-8") as f:
         json.dump(results_payload, f, indent=2, ensure_ascii=False)
         
-    print(f"💾 Đã lưu kết quả cấu hình tối ưu vào: {output_json}")
-    print("📌 Ghi chú: Trọng số trong ranking.py vẫn được giữ nguyên mặc định cho đến khi bạn hoàn tất chấm toàn bộ batch lớn.")
+    print(f"\n💾 Đã lưu cấu hình đa tầng vào: {output_json}")
 
 if __name__ == "__main__":
     run_ml_tuner()

@@ -8,17 +8,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
     <!-- Header -->
-    <header class="glass-header">
-        <div class="logo">
+    <header class="navbar">
+        <div class="nav-brand">
             <span class="glow-text">EBT Vision Search</span>
         </div>
         <nav class="nav-links">
-            <a href="index.html" class="active">Tìm kiếm</a>
-            <a href="algorithm.html">Thuật toán &amp; Cơ chế chấm</a>
+            <a href="index.html" class="nav-link active">Tìm kiếm</a>
+            <a href="algorithm.html" class="nav-link">Thuật toán &amp; Cơ chế chấm</a>
         </nav>
         <div class="system-status">
             <span class="status-dot online" id="status-dot"></span>
@@ -29,21 +29,21 @@
     <!-- Main Content -->
     <main>
         <!-- Search Section -->
-        <section class="hero-search">
+        <section class="search-section">
             <div class="search-container glass-panel">
                 <div class="query-types">
-                    <button class="type-btn query-type-btn active" data-type="KIS">KIS</button>
-                    <button class="type-btn query-type-btn" data-type="QA">Q&amp;A</button>
-                    <button class="type-btn query-type-btn" data-type="TRAKE">TRAKE</button>
+                    <button type="button" class="type-btn query-type-btn active" data-type="KIS" onclick="window.switchTrack('KIS');">KIS</button>
+                    <button type="button" class="type-btn query-type-btn" data-type="QA" onclick="window.switchTrack('QA');">Q&amp;A</button>
+                    <button type="button" class="type-btn query-type-btn" data-type="TRAKE" onclick="window.switchTrack('TRAKE');">TRAKE</button>
                 </div>
                 
-                <div class="search-box">
-                    <input type="text" id="search-input" placeholder="Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ">
-                    <button id="search-btn" class="primary-btn">
+                <form id="search-form" class="input-group" onsubmit="event.preventDefault(); window.performSearch();">
+                    <input type="text" id="search-input" class="search-input" placeholder="Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ" autocomplete="off">
+                    <button id="search-btn" type="submit" class="search-btn">
                         <span class="btn-text">Tìm kiếm</span>
                         <div class="loader hidden"></div>
                     </button>
-                </div>
+                </form>
                 
                 <div class="dataset-stats">
                     Dữ liệu: <span class="mono">177,321</span> keyframes | <span class="mono">873</span> videos | 🌐 Bi-lingual (VIE/ENG) | CLIP ViT-B/32
@@ -54,13 +54,13 @@
         <!-- Loading State -->
         <div id="loading-state" class="loading-state" style="display:none;">
             <div class="spinner"></div>
-            <p>Đang tìm kiếm...</p>
+            <p id="loading-status-text">Đang tìm kiếm...</p>
         </div>
 
         <!-- Error State -->
         <div id="error-state" class="error-state" style="display:none;">
             <p id="error-message" class="error-text"></p>
-            <button id="retry-btn" class="secondary-btn">Thử lại</button>
+            <button id="retry-btn" type="button" class="secondary-btn">Thử lại</button>
         </div>
 
         <!-- Results Section -->
@@ -81,6 +81,6 @@
         <p>EBT Project 2026 &mdash; AI Challenge | Powered by CLIP + Gemini + FAISS</p>
     </footer>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>

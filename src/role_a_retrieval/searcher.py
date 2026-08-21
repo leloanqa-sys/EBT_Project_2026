@@ -9,6 +9,22 @@ from typing import List, Optional, Union
 # Suppress benign HuggingFace Hub symlink warning on Windows
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
+# Force offline mode to prevent SSL connection hanging on Windows (assuming model is cached)
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+import requests
+import warnings
+import urllib3
+warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
+
+# Monkey-patch requests to disable SSL verification globally for HuggingFace Hub
+_orig_request = requests.Session.request
+def _unverified_request(self, method, url, *args, **kwargs):
+    kwargs['verify'] = False
+    return _orig_request(self, method, url, *args, **kwargs)
+requests.Session.request = _unverified_request
+
 from src.common.schemas import CandidateFrame
 from src.role_a_retrieval.feature_store import l2_normalize
 
@@ -21,7 +37,7 @@ class VectorSearcher:
     - Supports disk-based query embedding cache and fast video_ids filtering.
     """
     def __init__(self,
-                 index_path: str = "data/processed/faiss_index/clip_vit_b32.index",
+                 index_path: str = "data/processed/faiss_index/siglip2.index",
                  npz_path: str = "data/processed/mapping_array.npz",
                  manifest_path: str = "data/processed/faiss_index/index_manifest.json",
                  range_json_path: str = "data/processed/video_to_faiss_range.json",
@@ -44,10 +60,10 @@ class VectorSearcher:
             with open(self.manifest_path, "r", encoding="utf-8") as f:
                 self.manifest = json.load(f)
 
-            if self.manifest.get("model") != "clip-ViT-B-32":
-                raise RuntimeError(f"Startup Fail-Fast: Expected model 'clip-ViT-B-32', manifest has '{self.manifest.get('model')}'")
-            if self.manifest.get("dimension") != 512:
-                raise RuntimeError(f"Startup Fail-Fast: Expected dimension 512, manifest has {self.manifest.get('dimension')}")
+            if self.manifest.get("model") != "siglip2-base-patch16-224":
+                raise RuntimeError(f"Startup Fail-Fast: Expected model 'siglip2-base-patch16-224', manifest has '{self.manifest.get('model')}'")
+            if self.manifest.get("dimension") != 768:
+                raise RuntimeError(f"Startup Fail-Fast: Expected dimension 768, manifest has {self.manifest.get('dimension')}")
             if self.index.ntotal != self.manifest.get("ntotal"):
                 raise RuntimeError(f"Startup Fail-Fast: Index ntotal ({self.index.ntotal}) != Manifest ntotal ({self.manifest.get('ntotal')})")
 
@@ -74,38 +90,57 @@ class VectorSearcher:
         self._text_model = None
         self._text_tokenizer = None
 
-    def _init_clip_text_encoder(self):
-        """Lazy loader for CLIP text model."""
+    def _init_siglip_text_encoder(self):
+        """Khởi tạo SigLIP2 Text Encoder (768-dim)."""
         if self._text_model is None:
             try:
-                import open_clip
+                import ssl
+                # Bypass local SSL verification issues when downloading from HF
+                ssl._create_default_https_context = ssl._create_unverified_context
+            except Exception:
+                pass
+
+            try:
+                from transformers import AutoProcessor, AutoModel
                 import torch
-                model, _, _ = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
-                tokenizer = open_clip.get_tokenizer('ViT-B-32')
+                
+                model_name = "google/siglip2-base-patch16-224"
+                self._processor = AutoProcessor.from_pretrained(model_name)
+                model = AutoModel.from_pretrained(model_name)
                 model.eval()
-                self._text_model = (model, torch)
-                self._text_tokenizer = tokenizer
+                
+                # Chuyển sang GPU nếu có
+                self._device = "cuda" if torch.cuda.is_available() else "cpu"
+                model.to(self._device)
+                
+                self._text_model = model
             except Exception as e:
-                raise RuntimeError(f"Startup Fail-Fast: open_clip model loading failed ({e}). Please ensure open_clip and its dependencies are installed.")
+                raise RuntimeError(f"SigLIP2 loading failed ({e}). Kiểm tra cài đặt transformers/torch.")
 
     def encode_text_query(self, text_query: str) -> np.ndarray:
         """
-        Encodes query string into L2-normalized 512-dim CLIP text vector.
-        Uses SHA256 disk caching to prevent redundant model inference.
+        Encode text query thành vector 768-dim đã L2-normalized.
         """
+        import torch
         norm_query = text_query.strip().lower()
-        cache_key = hashlib.sha256(f"clip-ViT-B-32::{norm_query}".encode("utf-8")).hexdigest()
+        # Đổi key cache sang siglip2 để không bị xung đột với cache cũ của CLIP
+        cache_key = hashlib.sha256(f"siglip2-base-patch16-224::full-query-v2::{norm_query}".encode("utf-8")).hexdigest()
         cache_file = os.path.join(self.cache_dir, f"{cache_key}.npy")
 
         if os.path.exists(cache_file):
             return np.load(cache_file)
 
-        self._init_clip_text_encoder()
+        self._init_siglip_text_encoder()
 
-        model, torch = self._text_model
-        text_tokens = self._text_tokenizer([norm_query])
+        inputs = self._processor(text=[norm_query], padding="max_length", max_length=64, truncation=True, return_tensors="pt")
+        inputs = {k: v.to(self._device) for k, v in inputs.items()}
+
         with torch.no_grad():
-            text_features = model.encode_text(text_tokens)
+            text_features = self._text_model.get_text_features(**inputs)
+            # Handle return formats from different transformers/model versions
+            if hasattr(text_features, "pooler_output") and text_features.pooler_output is not None:
+                text_features = text_features.pooler_output
+            # L2 Normalization chuẩn
             vector = l2_normalize(text_features.cpu().numpy().astype(np.float32))
 
         np.save(cache_file, vector)
@@ -179,7 +214,7 @@ class VectorSearcher:
                     frame_idx=f_idx,
                     pts_time=p_time,
                     fps=fps_val,
-                    clip_score=float(score)
+                    siglip_score=float(score)
                 ))
 
             all_batch_candidates.append(candidates)

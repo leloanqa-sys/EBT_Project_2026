@@ -9,6 +9,8 @@ import pandas as pd
 from jinja2 import Template
 from src.common.schemas import CandidateFrame
 
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 if hasattr(sys.stdout, "reconfigure"):
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -248,7 +250,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 # Global memory cache to prevent re-scanning zip files repeatedly
 _REMOTE_URL_MAP = None
 
-def get_remote_zip_url(video_id: str) -> Optional[str]:
+def get_remote_zip_urls(video_id: str) -> List[str]:
     global _REMOTE_URL_MAP
     if _REMOTE_URL_MAP is None:
         _REMOTE_URL_MAP = {}
@@ -268,12 +270,20 @@ def get_remote_zip_url(video_id: str) -> Optional[str]:
             
     prefix = video_id.split("_")[0]
     expected_zip = f"Keyframes_{prefix}.zip"
-    return _REMOTE_URL_MAP.get(expected_zip)
+    if expected_zip in _REMOTE_URL_MAP:
+        return [_REMOTE_URL_MAP[expected_zip]]
+    
+    # Fallback to parts (e.g. Keyframes_L26_a.zip, Keyframes_L26_b.zip)
+    matches = []
+    for k, v in _REMOTE_URL_MAP.items():
+        if k.startswith(f"Keyframes_{prefix}"):
+            matches.append(v)
+    return matches
 
 def extract_single_file_from_remote_zip(video_id: str, fname: str) -> Optional[bytes]:
     """Smart Extraction: Fetches ONLY the required image bytes via HTTP Range from remote ZIP."""
-    url = get_remote_zip_url(video_id)
-    if not url: return None
+    urls = get_remote_zip_urls(video_id)
+    if not urls: return None
     
     target_suffix = f"{video_id}/{fname}"
     try:
@@ -286,13 +296,18 @@ def extract_single_file_from_remote_zip(video_id: str, fname: str) -> Optional[b
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
-        with remotezip.RemoteZip(url, session=session) as rz:
-            for inner_name in rz.namelist():
-                if inner_name.endswith(target_suffix):
-                    print(f"  [RemoteZip] Streamed {inner_name} directly from {url}")
-                    return rz.read(inner_name)
+        for url in urls:
+            try:
+                with remotezip.RemoteZip(url, session=session) as rz:
+                    for inner_name in rz.namelist():
+                        if inner_name.endswith(target_suffix):
+                            print(f"  [RemoteZip] Streamed {inner_name} directly from {url}")
+                            return rz.read(inner_name)
+            except Exception as e:
+                # 404 means the file doesn't exist in this specific zip, ignore and try next
+                continue
     except Exception as e:
-        print(f"  [RemoteZip] Error: {e}")
+        print(f"  [RemoteZip] Global Error: {e}")
     return None
 
 _ZIP_INDEX_CACHE: Dict[str, Dict[str, str]] = {}
@@ -351,14 +366,21 @@ def discover_zip_files() -> List[str]:
     if _DISCOVERED_ZIPS is not None:
         return _DISCOVERED_ZIPS
 
-    search_dirs = ["data/zips", "data/zip", "data/raw/zip", "data/raw"]
+    search_dirs = [
+        os.path.join(PROJECT_ROOT, "data", "zips"),
+        os.path.join(PROJECT_ROOT, "data", "zip"),
+        os.path.join(PROJECT_ROOT, "data", "raw", "zip"),
+        os.path.join(PROJECT_ROOT, "data", "raw"),
+        os.path.join(PROJECT_ROOT, "data", "archive_zips"),
+        "data/zips", "data/zip", "data/raw/zip", "data/raw"
+    ]
     found = []
     for sdir in search_dirs:
         if os.path.exists(sdir):
             try:
                 for fname in os.listdir(sdir):
                     if fname.endswith(".zip"):
-                        found.append(os.path.join(sdir, fname))
+                        found.append(os.path.abspath(os.path.join(sdir, fname)))
             except Exception:
                 pass
 
@@ -366,29 +388,31 @@ def discover_zip_files() -> List[str]:
     return _DISCOVERED_ZIPS
 
 def extract_single_file_from_zip(video_id: str, fname: str) -> Optional[bytes]:
-    """Extracts ONLY the requested single image file from any .zip file in memory."""
+    """Extracts ONLY the requested single image file from any .zip file in memory with O(1) lookup."""
     global _ZIP_INDEX_CACHE
     zip_files = discover_zip_files()
     if not zip_files:
         return None
 
-    target_suffix = f"{video_id}/{fname}"
+    target_suffix = f"{video_id}/{fname}".lower()
 
     for zip_path in zip_files:
         try:
             if zip_path not in _ZIP_INDEX_CACHE:
-                _ZIP_INDEX_CACHE[zip_path] = {}
+                index_map = {}
                 with zipfile.ZipFile(zip_path, "r") as zf:
                     for inner_name in zf.namelist():
                         if inner_name.endswith(".jpg") or inner_name.endswith(".png"):
-                            _ZIP_INDEX_CACHE[zip_path][inner_name] = inner_name
+                            norm = inner_name.replace("\\", "/")
+                            parts = norm.split("/")
+                            if len(parts) >= 2:
+                                key = f"{parts[-2]}/{parts[-1]}".lower()
+                                index_map[key] = inner_name
+                            index_map[norm.lower()] = inner_name
+                _ZIP_INDEX_CACHE[zip_path] = index_map
 
-            cached_names = _ZIP_INDEX_CACHE[zip_path]
-            matched_inner = None
-            for inner_name in cached_names:
-                if inner_name.endswith(target_suffix):
-                    matched_inner = inner_name
-                    break
+            cached_map = _ZIP_INDEX_CACHE[zip_path]
+            matched_inner = cached_map.get(target_suffix)
 
             if matched_inner:
                 with zipfile.ZipFile(zip_path, "r") as zf:
@@ -416,7 +440,7 @@ def extract_frame_from_video_mp4(video_id: str, frame_idx: int, video_dir: str =
         pass
     return None
 
-def resolve_keyframe_b64(video_id: str, frame_idx: int, keyframes_root: str = "data/raw/keyframes") -> Tuple[Optional[str], Optional[int], str]:
+def resolve_keyframe_b64(video_id: str, frame_idx: int, keyframes_root: str = "data/raw/keyframes", allow_remote: bool = False) -> Tuple[Optional[str], Optional[int], str]:
     """Smart Multi-Strategy Image Resolver."""
     keyframe_n = map_frame_idx_to_keyframe_n(video_id, frame_idx)
     possible_filenames = []
@@ -441,7 +465,7 @@ def resolve_keyframe_b64(video_id: str, frame_idx: int, keyframes_root: str = "d
                 except Exception:
                     pass
 
-    # Strategy 2: Smart On-Demand Zip Extraction (In Memory)
+    # Strategy 2: Smart On-Demand Zip Extraction (In Memory O(1))
     for fname in possible_filenames:
         img_bytes = extract_single_file_from_zip(video_id, fname)
         if img_bytes:
@@ -455,13 +479,14 @@ def resolve_keyframe_b64(video_id: str, frame_idx: int, keyframes_root: str = "d
         b64 = base64.b64encode(mp4_bytes).decode("utf-8")
         return f"data:image/jpeg;base64,{b64}", keyframe_n, expected_filename
 
-    # Strategy 4: Smart Remote ZIP HTTP Stream
-    for fname in possible_filenames:
-        img_bytes = extract_single_file_from_remote_zip(video_id, fname)
-        if img_bytes:
-            b64 = base64.b64encode(img_bytes).decode("utf-8")
-            mime = "image/png" if fname.endswith(".png") else "image/jpeg"
-            return f"data:{mime};base64,{b64}", keyframe_n, fname
+    # Strategy 4: Smart Remote ZIP HTTP Stream (Only if allow_remote=True)
+    if allow_remote:
+        for fname in possible_filenames:
+            img_bytes = extract_single_file_from_remote_zip(video_id, fname)
+            if img_bytes:
+                b64 = base64.b64encode(img_bytes).decode("utf-8")
+                mime = "image/png" if fname.endswith(".png") else "image/jpeg"
+                return f"data:{mime};base64,{b64}", keyframe_n, fname
 
     return None, keyframe_n, expected_filename
 

@@ -39,23 +39,20 @@ def ir_graph_to_prompt(ir_graph: VisualIRGraph, question: Optional[str] = None) 
         lines.append("If the image does NOT clearly match the description, return match=false and answer=null.")
         lines.append("If it matches, return match=true and provide a concise answer to the question.")
     else:
-        # KIS Mode — strict binary verification only, no narrative answer needed
-        lines.append("Carefully examine this image and verify ALL of the following conditions:")
+        # KIS Mode — semantic verification
+        lines.append("Carefully examine this image against the following key elements:")
         for check in entity_checks:
-            lines.append(f"  - Is there a {check} clearly visible?")
-        if ir_graph.relations:
-            for r in ir_graph.relations:
-                lines.append(f"  - Relation '{r.relation_type}': does the scene show this?")
+            lines.append(f"  - Subject/Object: {check}")
         if ir_graph.events:
             for e in ir_graph.events:
-                lines.append(f"  - Action/Event: is '{e.action}' happening?")
+                lines.append(f"  - Action/Event: {e.action}")
         lines.append("")
         lines.append(
-            "IMPORTANT: You must be STRICT. "
-            "If any specific color, gender, or clothing attribute does NOT match exactly "
-            "what you see in the image, return match=false. "
-            "Do NOT guess or extrapolate. Base your judgment strictly on visible evidence. "
-            "Return match=true ONLY if ALL conditions above are clearly satisfied."
+            "IMPORTANT INSTRUCTION: "
+            "You are evaluating if this image represents the CORE SEMANTIC MEANING of the query. "
+            "Do NOT be overly strict about minor background details, exact clothing colors, or small missed objects if the main action and primary subjects clearly match. "
+            "Often, textual queries contain slight errors (e.g. saying 'woman' instead of 'man'). If the core event (e.g. 'harvesting pineapples', 'playing metal instruments') is a perfect match, you should accept it. "
+            "Return match=true if this image is a highly plausible match for the main event/subjects described. Return match=false only if it is clearly a different scene."
         )
 
     return "\n".join(lines)

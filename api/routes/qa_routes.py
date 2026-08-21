@@ -31,8 +31,10 @@ from api.routes.kis_routes import get_video_metadata
 @router.post("/search/qa", response_model=QAResponse)
 async def search_qa(req: QARequest):
     from fastapi.concurrency import run_in_threadpool
+    from api.main import _get_searcher
     try:
-        pipeline = QAPipeline(detect_threshold=0.3)
+        searcher_instance = _get_searcher()
+        pipeline = QAPipeline(detect_threshold=0.3, searcher=searcher_instance)
         query_id = f"qa_{uuid.uuid4().hex[:8]}"
         
         result = await run_in_threadpool(
@@ -54,7 +56,7 @@ async def search_qa(req: QARequest):
                 "frame_idx": c_obj.frame_idx,
                 "timestamp": pts_str,
                 "frame_url": f"/api/v1/image/{c_obj.video_id}/{c_obj.frame_idx}",
-                "clip_score": round(c_obj.clip_score, 4)
+                "siglip_score": round(c_obj.siglip_score, 4)
             })
             
         return {

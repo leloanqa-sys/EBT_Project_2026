@@ -19,7 +19,7 @@ class FeatureStore:
     Role A FeatureStore: Provides chunked loading, mmap reading, and vector normalization
     to prevent memory spikes during index building and inspection.
     """
-    def __init__(self, features_dir: str = "data/raw/clip-features-32",
+    def __init__(self, features_dir: str = "data/raw/siglip2-features",
                  order_json_path: str = "data/processed/video_id_order.json"):
         self.features_dir = features_dir
         self.order_json_path = order_json_path

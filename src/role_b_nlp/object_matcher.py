@@ -111,7 +111,7 @@ def fuse_candidates(candidates: List[CandidateFrame], parsed_query: Any, objects
             obj_score = 0.0
             
         cand.fusion_score = compute_fusion_score(
-            clip_score=cand.clip_score,
+            siglip_score=cand.siglip_score,
             obj_score=obj_score,
             has_target_objects=bool(target_objs)
         )

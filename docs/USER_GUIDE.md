@@ -23,7 +23,7 @@ cd C:\Users\Admin\Downloads\EBT_Project_2026
 
 ### Bước 2: Khởi động API Server & Giao diện Web
 ```powershell
-python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir api --reload-dir src
 ```
 *Truy cập ngay trên trình duyệt:* **`http://localhost:8000/`**
 

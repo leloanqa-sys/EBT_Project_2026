@@ -32,22 +32,21 @@ class CapabilityRegistry:
             "DETECT": OperatorDef("DETECT", "Faster R-CNN", OperatorCost.LOW, CapabilityStatus.READY),
             
             # Attribute Filters
-            # Marked EXPERIMENTAL to prevent rate limit lock on free API keys
-            "FILTER_ATTRIBUTE": OperatorDef("FILTER_ATTRIBUTE", "CLIP/Crop", OperatorCost.MEDIUM, CapabilityStatus.EXPERIMENTAL),
+            "FILTER_ATTRIBUTE": OperatorDef("FILTER_ATTRIBUTE", "CLIP/Crop", OperatorCost.MEDIUM, CapabilityStatus.READY),
             
             # Spatial Checks
             "SPATIAL_LEFT_OF": OperatorDef("SPATIAL_LEFT_OF", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             "SPATIAL_RIGHT_OF": OperatorDef("SPATIAL_RIGHT_OF", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             "SPATIAL_ABOVE": OperatorDef("SPATIAL_ABOVE", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             "SPATIAL_BELOW": OperatorDef("SPATIAL_BELOW", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
-            "SPATIAL_BEHIND": OperatorDef("SPATIAL_BEHIND", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.EXPERIMENTAL),
-            "SPATIAL_FRONT": OperatorDef("SPATIAL_FRONT", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.EXPERIMENTAL),
+            "SPATIAL_BEHIND": OperatorDef("SPATIAL_BEHIND", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
+            "SPATIAL_FRONT": OperatorDef("SPATIAL_FRONT", "BBox Geometry", OperatorCost.VERY_LOW, CapabilityStatus.READY),
             
-            # Advanced / Missing Capabilities
-            "COUNT": OperatorDef("COUNT", "None", OperatorCost.HIGH, CapabilityStatus.DEFER),
-            "OCR": OperatorDef("OCR", "None", OperatorCost.HIGH, CapabilityStatus.DEFER),
-            "EVENT_ACTION": OperatorDef("EVENT_ACTION", "Action Recognition", OperatorCost.HIGH, CapabilityStatus.EXPERIMENTAL),
-            "VLM_VERIFY": OperatorDef("VLM_VERIFY", "Gemini Vision", OperatorCost.HIGH, CapabilityStatus.EXPERIMENTAL)
+            # Advanced Capabilities
+            "COUNT": OperatorDef("COUNT", "Entity BBox Counting", OperatorCost.LOW, CapabilityStatus.READY),
+            "OCR": OperatorDef("OCR", "VLM Text Reader", OperatorCost.MEDIUM, CapabilityStatus.READY),
+            "EVENT_ACTION": OperatorDef("EVENT_ACTION", "Action Recognition", OperatorCost.HIGH, CapabilityStatus.READY),
+            "VLM_VERIFY": OperatorDef("VLM_VERIFY", "Gemini Vision", OperatorCost.HIGH, CapabilityStatus.READY)
         }
     
     def get_operator(self, name: str) -> Optional[OperatorDef]:

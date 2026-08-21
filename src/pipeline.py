@@ -12,7 +12,7 @@ Design decisions (self-proposed based on evidence):
    
 2. SPATIAL: Existential semantics (∃ pair satisfies), UNKNOWN=Keep
 
-3. Generator: raw_text -> CLIP (G2 configuration, frozen after G0/G1/G2 audit)
+3. Generator: raw_text -> SigLIP2 (768-dim, google/siglip2-base-patch16-224)
 
 4. Top-K: retrieve 500, return top-100 for submission
 """
@@ -78,7 +78,7 @@ class MVPPipeline:
         """
         Full pipeline for one query.
         Step 1: M1 - Parse NLP -> VisualIR (with Gemini API, cached)
-        Step 2: M2 - CLIP retrieve top-K candidates
+        Step 2: M2 - SigLIP2 retrieve top-K candidates via FAISS
         Step 3: Operators - DETECT / SPATIAL (SQLite, UNKNOWN=Keep)
         Step 4: Return ranked candidates
         """
@@ -101,127 +101,94 @@ class MVPPipeline:
         
         candidates.sort(key=lambda c: c.fusion_score, reverse=True)
         
-        # === STEP 5: VQA Re-ranking (Role D - Agent 3 Escalation) ===
+        # === STEP 5: VQA Re-ranking & Active Relevance Feedback (Dual-Layer) ===
         try:
             from src.role_c_logic.executor import should_escalate_to_vlm
             from src.role_c_logic.vlm_client import GeminiVisionClient
             from src.role_c_logic.prompt_generator import ir_graph_to_prompt
+            from src.role_c_logic.ranking import diversify_candidates
             
-            # Quota Free Safe: Giới hạn chỉ escalate tối đa top-10 candidates để tránh Rate Limit 429
-            top_vlm_pool = candidates[:10]
+            # QUOTA OPTIMIZATION:
+            # Lọc đa dạng video TRƯỚC KHI gửi cho VLM.
+            # Tránh lãng phí 10 lượt gọi API chỉ cho 1 video duy nhất.
+            pre_vlm_pool = diversify_candidates(candidates, top_k=20, distinct_top_n=10)
+            top_vlm_pool = pre_vlm_pool[:10]
             escalated_candidates = [c for c in top_vlm_pool if should_escalate_to_vlm(c, ir_graph)]
             
             if escalated_candidates:
                 vlm_client = GeminiVisionClient()
                 vlm_prompt = ir_graph_to_prompt(ir_graph, question=question)
-                prompt_version = "v2_qa" if question else "v1" # Can be updated if prompt structure changes
+                prompt_version = "v2_qa" if question else "v1"
                 
-                print(f"  [Pipeline] Escalating {len(escalated_candidates)} candidates to Gemini VLM...")
+                print(f"  [Pipeline] Escalating {len(escalated_candidates)} candidates to Gemini VLM (Pass 1 - Strict)...")
                 results = vlm_client.verify_candidates_batch(escalated_candidates, vlm_prompt, ir_graph.raw_text, prompt_version)
                 
+                num_matches = 0
                 for c, res in zip(escalated_candidates, results):
                     is_match = res.get("match", False)
                     vqa_answer = res.get("answer", None)
                     c.vqa_answer = vqa_answer
                     
                     if is_match:
+                        num_matches += 1
                         c.fusion_score += 5.0 # RANK_1_BONUS
                         ans_str = f" | Ans: {vqa_answer}" if vqa_answer else ""
                         print(f"    -> VLM Match for {c.video_id}:{c.frame_idx} (Bonus +5.0){ans_str}")
                     else:
                         print(f"    -> VLM Mismatch for {c.video_id}:{c.frame_idx}")
                         
+                # Active Relevance Feedback: If 100% mismatch, fallback to relaxed conceptual association layer
+                if num_matches == 0 and getattr(ir_graph, 'relaxed_query_en', None):
+                    relaxed_query = ir_graph.relaxed_query_en.strip()
+                    strict_query = getattr(ir_graph, 'clip_query_en', '') or ir_graph.raw_text
+                    if relaxed_query and relaxed_query.lower() != strict_query.lower():
+                        print(f"  [Pipeline] [Active Feedback] 100% VLM Mismatch detected on strict pass! Activating Relaxed Conceptual Layer: '{relaxed_query}'")
+                        
+                        # Retrieve new candidates with relaxed query
+                        relaxed_candidates = self._searcher.search_by_text(relaxed_query, top_k=self.top_k_retrieve)
+                        
+                        # Filter out already checked frames
+                        checked_keys = {f"{c.video_id}_{c.frame_idx}" for c in escalated_candidates}
+                        filtered_relaxed = [c for c in relaxed_candidates if f"{c.video_id}_{c.frame_idx}" not in checked_keys]
+                        
+                        for c in filtered_relaxed:
+                            c._temp_detect_scores = []
+                            c._temp_spatial_scores = []
+                            c.is_ambiguous = False
+                            
+                        from src.role_c_logic.ranking import compute_fusion_scores
+                        compute_fusion_scores(filtered_relaxed, ir_graph=ir_graph)
+                        filtered_relaxed = self._executor._apply_nms(filtered_relaxed)
+                        filtered_relaxed.sort(key=lambda c: c.fusion_score, reverse=True)
+                        
+                        # Escalate top 10 from relaxed layer to VLM
+                        relaxed_vlm_pool = filtered_relaxed[:10]
+                        relaxed_escalated = [c for c in relaxed_vlm_pool if should_escalate_to_vlm(c, ir_graph)]
+                        
+                        if relaxed_escalated:
+                            print(f"  [Pipeline] Escalating {len(relaxed_escalated)} relaxed candidates to Gemini VLM (Pass 2 - Relaxed)...")
+                            relaxed_results = vlm_client.verify_candidates_batch(relaxed_escalated, vlm_prompt, ir_graph.raw_text, f"{prompt_version}_relaxed")
+                            for c, res in zip(relaxed_escalated, relaxed_results):
+                                is_match = res.get("match", False)
+                                vqa_answer = res.get("answer", None)
+                                c.vqa_answer = vqa_answer
+                                if is_match:
+                                    c.fusion_score += 4.5 # Slightly lower bonus than strict match but high enough to take Rank 1
+                                    ans_str = f" | Ans: {vqa_answer}" if vqa_answer else ""
+                                    print(f"    -> VLM Match (Relaxed) for {c.video_id}:{c.frame_idx} (Bonus +4.5){ans_str}")
+                                else:
+                                    print(f"    -> VLM Mismatch (Relaxed) for {c.video_id}:{c.frame_idx}")
+                        
+                        # Merge candidates
+                        candidates.extend(filtered_relaxed)
+                        
         except Exception as e:
-            print(f"  [Pipeline] Gemini VLM Re-ranking failed: {e}")
+            print(f"  [Pipeline] Gemini VLM Re-ranking / Active Feedback failed: {e}")
             
-        # === STEP 5.5: Post-VLM Temporal Interpolation & Betting Optimization ===
-        # Kích hoạt CHỈ KHI có VLM-confirmed anchor (fusion >= 5.0 = clip+obj+spatial MAX + RANK_1_BONUS).
-        # Mục đích: Cover AIC's ±5-frame scoring window quanh anchor đã xác nhận.
-        #
-        # BUG FIXES (Plan C):
-        #   C1: fps lấy từ anchor.fps (NPZ) thay vì frame_idx/pts_time (sai)
-        #   C2: threshold 4.0 -> 5.0 (chỉ VLM-confirmed, không phải high-score tự nhiên)
-        #   C3: Giới hạn MAX_SYNTHETIC_PER_ANCHOR=10, MAX_SYNTHETIC_TOTAL=30
-        #   C4: betting_interval=3 (target AIC ±5-frame window, không thừa slots)
-        MAX_SYNTHETIC_PER_ANCHOR = 10   # Đủ để cover window ±5 frames với interval=3
-        MAX_SYNTHETIC_TOTAL      = 30   # Tổng synthetics <= 30% Top-100
-        BETTING_INTERVAL         = 3    # frames — target AIC's ±5-frame hit window
-        INTERPOLATE_WINDOW_SEC   = 1.5  # +/- 1.5s (thay vì 3s — tránh flood)
-
-        anchor_frames = [c for c in candidates if c.fusion_score >= 5.0]  # C2: chỉ VLM-confirmed
-        if anchor_frames:
-            print(f"  [Pipeline] Temporal Interpolation: {len(anchor_frames)} VLM-confirmed anchor(s)")
-            new_synthetic_candidates = []
-            total_synthetics = 0
-
-            for anchor in anchor_frames:
-                if total_synthetics >= MAX_SYNTHETIC_TOTAL:
-                    break
-
-                # C1: Dùng anchor.fps từ NPZ (chính xác), không tính lại
-                fps = anchor.fps if (anchor.fps and 10.0 <= anchor.fps <= 60.0) else 30.0
-
-                frames_to_span = int(INTERPOLATE_WINDOW_SEC * fps)
-                start_frame = max(0, anchor.frame_idx - frames_to_span)
-                end_frame   = anchor.frame_idx + frames_to_span
-                anchor_synthetics = 0
-
-                # Interpolate left
-                curr_frame = anchor.frame_idx - BETTING_INTERVAL
-                while curr_frame >= start_frame and anchor_synthetics < MAX_SYNTHETIC_PER_ANCHOR and total_synthetics < MAX_SYNTHETIC_TOTAL:
-                    dist_sec = abs(anchor.frame_idx - curr_frame) / fps
-                    new_synthetic_candidates.append(CandidateFrame(
-                        faiss_id=-1,
-                        video_id=anchor.video_id,
-                        frame_idx=int(curr_frame),
-                        pts_time=curr_frame / fps,
-                        fps=fps,
-                        clip_score=anchor.clip_score,
-                        obj_score=anchor.obj_score,
-                        spatial_score=anchor.spatial_score,
-                        fusion_score=anchor.fusion_score - 0.05 * dist_sec,
-                        vqa_answer=anchor.vqa_answer
-                    ))
-                    curr_frame -= BETTING_INTERVAL
-                    anchor_synthetics += 1
-                    total_synthetics  += 1
-
-                # Interpolate right
-                curr_frame = anchor.frame_idx + BETTING_INTERVAL
-                while curr_frame <= end_frame and anchor_synthetics < MAX_SYNTHETIC_PER_ANCHOR and total_synthetics < MAX_SYNTHETIC_TOTAL:
-                    dist_sec = abs(curr_frame - anchor.frame_idx) / fps
-                    new_synthetic_candidates.append(CandidateFrame(
-                        faiss_id=-1,
-                        video_id=anchor.video_id,
-                        frame_idx=int(curr_frame),
-                        pts_time=curr_frame / fps,
-                        fps=fps,
-                        clip_score=anchor.clip_score,
-                        obj_score=anchor.obj_score,
-                        spatial_score=anchor.spatial_score,
-                        fusion_score=anchor.fusion_score - 0.05 * dist_sec,
-                        vqa_answer=anchor.vqa_answer
-                    ))
-                    curr_frame += BETTING_INTERVAL
-                    anchor_synthetics += 1
-                    total_synthetics  += 1
-
-            print(f"  [Pipeline] Generated {total_synthetics} synthetic frame(s) (cap={MAX_SYNTHETIC_TOTAL})")
-            candidates.extend(new_synthetic_candidates)
-
-            # Deduplicate by (video_id, frame_idx) — keep highest score
-            seen = {}
-            unique_candidates = []
-            candidates.sort(key=lambda c: c.fusion_score, reverse=True)
-            for c in candidates:
-                key = f"{c.video_id}_{c.frame_idx}"
-                if key not in seen:
-                    seen[key] = True
-                    unique_candidates.append(c)
-            candidates = unique_candidates
-
-        # Re-sort after VQA bonuses and Temporal Boosting
-        candidates.sort(key=lambda c: c.fusion_score, reverse=True)
+        # === STEP 6: Final Ranking (AIC Confidence Portfolio Strategy) ===
+        # Optimizes for mean(R@1, R@5, R@20, R@50, R@100)
+        from src.role_c_logic.ranking import rank_confidence_portfolio
+        candidates = rank_confidence_portfolio(candidates, top_k=self.top_k_retrieve)
 
         latency = (time.time() - t_start) * 1000
 
@@ -269,7 +236,8 @@ def to_submission(result: PipelineResult, top_k: int = TOP_K_SUBMIT) -> Submissi
             rank=rank,
             video_id=c.video_id,
             frame_id=c.frame_idx,
-            confidence_score=c.clip_score,
+            confidence_score=getattr(c, 'fusion_score', c.siglip_score),
+            answer=c.vqa_answer,
             vqa_answer=c.vqa_answer
         ))
     return SubmissionOutput(
@@ -285,18 +253,17 @@ def export_csv(submissions: List[SubmissionOutput], output_path: str = "outputs/
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         
-        # Check if it's QA based on first item
-        is_qa = False
-        if submissions and submissions[0].query_type == QueryType.QA:
-            is_qa = True
-            writer.writerow(["video_id", "frame_idx", "answer"])
+        # Check if it's QA based on query_type
+        is_qa = bool(submissions and submissions[0].query_type == QueryType.QA)
+        if is_qa:
+            writer.writerow(["query_id", "rank", "video_id", "frame_id", "answer", "confidence_score"])
         else:
-            writer.writerow(["query_id", "rank", "video_id", "frame_id", "clip_score"])
+            writer.writerow(["query_id", "rank", "video_id", "frame_id", "confidence_score"])
             
         for sub in submissions:
             for item in sub.items:
                 if is_qa:
-                    writer.writerow([item.video_id, item.frame_id, item.vqa_answer or ""])
+                    writer.writerow([sub.query_id, item.rank, item.video_id, item.frame_id, item.answer or item.vqa_answer or "", f"{item.confidence_score:.6f}"])
                 else:
                     writer.writerow([sub.query_id, item.rank, item.video_id, item.frame_id, f"{item.confidence_score:.6f}"])
     print(f"  [MVP] Submission saved to {output_path}")

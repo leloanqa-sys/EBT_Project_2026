@@ -44,7 +44,7 @@ def run_interactive(pipeline: MVPPipeline):
         if result.candidates:
             print(f"\n  Top-5 Results:")
             for i, c in enumerate(result.candidates[:5], 1):
-                print(f"    #{i:2d}  {c.video_id}  frame={c.frame_idx:4d}  score={c.clip_score:.4f}")
+                print(f"    #{i:2d}  {c.video_id}  frame={c.frame_idx:4d}  score={c.siglip_score:.4f}")
 
         sub = to_submission(result)
         out_path = f"outputs/submission_{qid}.csv"
@@ -104,7 +104,7 @@ def main():
         if result.candidates:
             print("\n  Top-10:")
             for i, c in enumerate(result.candidates[:10], 1):
-                print(f"    #{i:2d}  {c.video_id}  frame={c.frame_idx:4d}  score={c.clip_score:.4f}")
+                print(f"    #{i:2d}  {c.video_id}  frame={c.frame_idx:4d}  score={c.siglip_score:.4f}")
         sub = to_submission(result)
         export_csv([sub], "outputs/submission_cli.csv")
     else:

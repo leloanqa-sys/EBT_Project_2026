@@ -99,12 +99,12 @@ def run_suite():
                     obj_match_rate = len(matched_objs) / max(len(expected_objs), 1)
 
                     # Grade verification (True Positive / Partial / Mismatch)
-                    clip_score = r.get("clip_score", 0.0)
+                    siglip_score = r.get("siglip_score", 0.0)
                     fusion_score = r.get("fusion_score", 0.0)
 
-                    if obj_match_rate >= 0.5 or clip_score > 0.23:
+                    if obj_match_rate >= 0.5 or siglip_score > 0.23:
                         verdict = "MATCH"
-                    elif obj_match_rate > 0 or clip_score > 0.21:
+                    elif obj_match_rate > 0 or siglip_score > 0.21:
                         verdict = "PARTIAL"
                     else:
                         verdict = "MISMATCH"
@@ -121,7 +121,7 @@ def run_suite():
                         "video_id": r.get("video_id"),
                         "frame_idx": r.get("frame_idx"),
                         "timestamp": r.get("timestamp"),
-                        "clip_score": clip_score,
+                        "siglip_score": siglip_score,
                         "obj_score": r.get("obj_score"),
                         "fusion_score": fusion_score,
                         "frame_url": frame_url,

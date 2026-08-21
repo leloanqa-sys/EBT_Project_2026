@@ -40,10 +40,10 @@ def format_submission(submission: SubmissionOutput, out_dir: str = "outputs") ->
 def export_submission_csv(output: SubmissionOutput, output_filepath: str) -> str:
     """
     Role C Output Formatter:
-    Exports response candidates into CSV file format.
-    - KIS: rank,video_id,frame_id,confidence_score
-    - QA: rank,video_id,frame_id,answer,confidence_score
-    - TRAKE: rank,video_id,frame_id,confidence_score
+    Exports response candidates into CSV file format conforming to AIC 2026 standards.
+    - KIS: query_id,rank,video_id,frame_id,confidence_score
+    - QA: query_id,rank,video_id,frame_id,answer,confidence_score
+    - TRAKE: query_id,rank,video_id,frame_id,confidence_score
     """
     out_dir = os.path.dirname(output_filepath)
     if out_dir:
@@ -53,24 +53,28 @@ def export_submission_csv(output: SubmissionOutput, output_filepath: str) -> str
         writer = csv.writer(f)
         
         if output.query_type == QueryType.QA:
-            writer.writerow(['rank', 'video_id', 'frame_id', 'answer', 'confidence_score'])
+            writer.writerow(['query_id', 'rank', 'video_id', 'frame_id', 'answer', 'confidence_score'])
             for item in output.items:
+                ans_str = item.answer or item.vqa_answer or ''
                 writer.writerow([
+                    output.query_id,
                     item.rank,
                     item.video_id,
                     item.frame_id,
-                    item.answer if item.answer else '',
-                    round(item.confidence_score, 4)
+                    ans_str,
+                    f"{item.confidence_score:.6f}"
                 ])
         else:
-            writer.writerow(['rank', 'video_id', 'frame_id', 'confidence_score'])
+            writer.writerow(['query_id', 'rank', 'video_id', 'frame_id', 'confidence_score'])
             for item in output.items:
                 writer.writerow([
+                    output.query_id,
                     item.rank,
                     item.video_id,
                     item.frame_id,
-                    round(item.confidence_score, 4)
+                    f"{item.confidence_score:.6f}"
                 ])
 
     return output_filepath
+
 

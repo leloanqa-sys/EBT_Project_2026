@@ -27,11 +27,18 @@ class TRAKEResponse(BaseModel):
 
 @router.post("/search/trake", response_model=TRAKEResponse)
 async def search_trake(req: TRAKERequest):
+    from fastapi.concurrency import run_in_threadpool
     try:
-        pipeline = TRAKEPipeline(detect_threshold=0.3)
+        from api.main import _get_searcher
+        searcher = _get_searcher()
+        if searcher is None:
+            raise HTTPException(status_code=503, detail="VectorSearcher not loaded")
+
+        pipeline = TRAKEPipeline(detect_threshold=0.3, searcher=searcher)
         query_id = f"trake_{uuid.uuid4().hex[:8]}"
         
-        result = pipeline.run(
+        result = await run_in_threadpool(
+            pipeline.run,
             query_id=query_id,
             main_query=req.query,
             sub_events=req.events,
@@ -50,7 +57,7 @@ async def search_trake(req: TRAKERequest):
                     "frame_idx": c_obj.frame_idx,
                     "timestamp": pts_str,
                     "frame_url": f"/api/v1/image/{c_obj.video_id}/{c_obj.frame_idx}",
-                    "clip_score": round(c_obj.clip_score, 4)
+                    "siglip_score": round(c_obj.siglip_score, 4)
                 })
                 
             seqs_out.append({
@@ -67,6 +74,8 @@ async def search_trake(req: TRAKERequest):
             "sequences": seqs_out
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[TRAKE API] Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

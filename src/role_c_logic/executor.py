@@ -238,38 +238,37 @@ class DeterministicExecutor:
             
         return candidates
 
-    def _apply_nms(self, candidates: List[CandidateFrame], min_seconds: float = 5.0, max_per_video: int = 5) -> List[CandidateFrame]:
-        """NMS: penalizes near-duplicate frames AND hard-caps slots per video.
-
-        Plan C Fix (C4): Added max_per_video hard-cap.
-        VLM RANK_1_BONUS = +5.0, old penalty = -0.05 → tê liệt hoàn toàn.
-        Hard-cap đảm bảo 1 video không chiếm quá max_per_video slots trong Top 100.
+    def _apply_nms(self, candidates: List[CandidateFrame], min_seconds: float = 4.0, max_per_video: int = 5) -> List[CandidateFrame]:
         """
-        candidates.sort(key=lambda c: c.fusion_score, reverse=True)
-
-        added_videos: Dict[str, List] = {}   # video_id -> [(pts_time, score)]
-        video_slot_count: Dict[str, int] = {}  # video_id -> slot count
-
+        Hard NMS: Ensures that each rank corresponds to a completely distinct [s, e] segment.
+        Drops any candidate that is within min_seconds of a higher-scoring candidate in the same video.
+        Also applies a hard cap on maximum distinct segments per video.
+        """
+        candidates.sort(key=lambda c: getattr(c, 'fusion_score', c.siglip_score), reverse=True)
+        result = []
+        added_videos: Dict[str, List[float]] = {}
+        
         for c in candidates:
             vid = c.video_id
-            slot_count = video_slot_count.get(vid, 0)
-
-            # Hard-cap: drop nếu video đã chiếm đủ max_per_video slots
-            if slot_count >= max_per_video:
-                c.fusion_score = -999.0
-                continue
-
-            # Soft penalty nếu có frame trong cùng video quá gần về thời gian
             pts = c.pts_time
             prev_entries = added_videos.get(vid, [])
-            if any(abs(pts - t) < min_seconds for t, _ in prev_entries):
-                c.fusion_score -= 0.05
-
-            added_videos.setdefault(vid, []).append((pts, c.fusion_score))
-            video_slot_count[vid] = slot_count + 1
-
-        # Lọc bỏ các candidate bị drop (score = -999)
-        return [c for c in candidates if c.fusion_score > -999.0]
+            
+            # 1. Hard cap per video (diversity constraint)
+            if len(prev_entries) >= max_per_video:
+                continue
+                
+            # 2. Hard NMS temporal window check
+            is_overlap = False
+            for t in prev_entries:
+                if abs(pts - t) < min_seconds:
+                    is_overlap = True
+                    break
+                    
+            if not is_overlap:
+                result.append(c)
+                added_videos.setdefault(vid, []).append(pts)
+                
+        return result
 
     def execute_plan(self, plan: ExecutionPlan, ir_graph: VisualIRGraph, top_k_raw: int = 300) -> List[CandidateFrame]:
         trace = ExecutionTraceLog(
@@ -298,9 +297,31 @@ class DeterministicExecutor:
                 continue
                 
             if step.operator_name == "CLIP_RETRIEVE":
-                # Ensure raw_text is used as per PO's generator audit
-                search_query = getattr(ir_graph, 'clip_query_en', None) or ir_graph.raw_text
-                candidates = self.searcher.search_by_text(search_query, top_k=step.args.get("k", top_k_raw))
+                # Merge raw, translated, and relaxed views so a long Vietnamese
+                # query can recover frames missed by one tokenizer formulation.
+                query_candidates: Dict[Tuple[str, int], Tuple[CandidateFrame, float]] = {}
+                search_queries = [
+                    (ir_graph.raw_text, 1.0),
+                    (getattr(ir_graph, "clip_query_en", ""), 1.0),
+                    (getattr(ir_graph, "relaxed_query_en", ""), 0.5),
+                ]
+                seen_queries = set()
+                for search_query, query_weight in search_queries:
+                    search_query = search_query.strip() if search_query else ""
+                    if not search_query or search_query in seen_queries:
+                        continue
+                    seen_queries.add(search_query)
+                    retrieved = self.searcher.search_by_text(search_query, top_k=step.args.get("k", top_k_raw))
+                    for rank, candidate in enumerate(retrieved, start=1):
+                        key = (candidate.video_id, candidate.frame_idx)
+                        reciprocal_rank = query_weight / (60.0 + rank)
+                        previous = query_candidates.get(key)
+                        if previous is None:
+                            query_candidates[key] = (candidate, reciprocal_rank)
+                        else:
+                            previous[0].siglip_score = max(previous[0].siglip_score, candidate.siglip_score)
+                            query_candidates[key] = (previous[0], previous[1] + reciprocal_rank)
+                candidates = [item[0] for item in sorted(query_candidates.values(), key=lambda item: item[1], reverse=True)[:top_k_raw]]
                 for c in candidates:
                     c._temp_detect_scores = []
                     c._temp_spatial_scores = []
@@ -378,7 +399,7 @@ def should_escalate_to_vlm(c: CandidateFrame, ir_graph: VisualIRGraph = None) ->
     if getattr(c, 'is_ambiguous', False):
         return True
         
-    if c.clip_score < 0.5: # Low retrieval confidence
+    if c.siglip_score < 0.5: # Low retrieval confidence
         return True
         
     if ir_graph:

@@ -3,157 +3,217 @@
  * EBT Project 2026
  */
 
-const DEMO_MODE = true; // Set to true to show demo data if API fails
+const DEMO_MODE = false; // Set to true to show demo data if API fails
 
-document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
-    const searchInput = document.getElementById('search-input');
-    const searchBtn = document.getElementById('search-btn');
-    const queryTypeBtns = document.querySelectorAll('.query-type-btn');
-    const loadingState = document.getElementById('loading-state');
-    const errorState = document.getElementById('error-state');
-    const errorMessage = document.getElementById('error-message');
-    const retryBtn = document.getElementById('retry-btn');
-    const resultsContainer = document.getElementById('results-container');
-    const resultsGrid = document.getElementById('results-grid');
-    const summaryBar = document.getElementById('summary-bar');
-    const parsedInfoContainer = document.getElementById('parsed-info');
+let searchInput, searchBtn, queryTypeBtns, loadingState, errorState, errorMessage, retryBtn, resultsContainer, resultsGrid, summaryBar, parsedInfoContainer;
+let activeQueryType = 'KIS';
+window.currentQueryData = null; // Store data for CSV export
 
-    let activeQueryType = 'KIS';
-    window.currentQueryData = null; // Store data for CSV export
+function init() {
+    searchInput = document.getElementById('search-input');
+    searchBtn = document.getElementById('search-btn');
+    queryTypeBtns = document.querySelectorAll('.query-type-btn');
+    loadingState = document.getElementById('loading-state');
+    errorState = document.getElementById('error-state');
+    errorMessage = document.getElementById('error-message');
+    retryBtn = document.getElementById('retry-btn');
+    resultsContainer = document.getElementById('results-container');
+    resultsGrid = document.getElementById('results-grid');
+    summaryBar = document.getElementById('summary-bar');
+    parsedInfoContainer = document.getElementById('parsed-info');
 
-    // Initialization
-    init();
+    setupEventListeners();
+    checkSystemStatus();
+    console.log('[EBT Search UI] Initialized successfully. Ready for queries.');
+}
 
-    function init() {
-        setupEventListeners();
+async function checkSystemStatus() {
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    try {
+        const res = await fetch('/api/health');
+        if (res.ok) {
+            const data = await res.json();
+            if (statusText) statusText.textContent = data.searcher_loaded ? 'Sẵn sàng (LIVE)' : 'Sẵn sàng (FAISS)';
+            if (statusDot) {
+                statusDot.className = 'status-dot online';
+                statusDot.style.background = '#22c55e';
+            }
+        }
+    } catch (e) {
+        if (statusText) statusText.textContent = 'Mất kết nối Backend';
+        if (statusDot) {
+            statusDot.className = 'status-dot offline';
+            statusDot.style.background = '#ef4444';
+        }
     }
+}
 
-    function setupEventListeners() {
+window.switchTrack = function(trackType) {
+    activeQueryType = trackType.toUpperCase();
+    if (!queryTypeBtns) queryTypeBtns = document.querySelectorAll('.query-type-btn');
+    if (!searchInput) searchInput = document.getElementById('search-input');
+    
+    queryTypeBtns.forEach(b => {
+        const t = b.dataset.type || b.textContent.trim().toUpperCase();
+        if (t === activeQueryType) {
+            b.classList.add('active');
+        } else {
+            b.classList.remove('active');
+        }
+    });
+
+    if (searchInput) {
+        if (activeQueryType === 'KIS') {
+            searchInput.placeholder = 'Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ';
+        } else if (activeQueryType === 'QA') {
+            searchInput.placeholder = 'Nhập câu hỏi (VIE / ENG)... VD: What is the man doing? / Người đó làm gì?';
+        } else if (activeQueryType === 'TRAKE') {
+            searchInput.placeholder = 'Nhập truy vấn tracking (VIE / ENG)... VD: Step 1: running, Step 2: jumping';
+        }
+    }
+};
+
+function setupEventListeners() {
+    const searchForm = document.getElementById('search-form');
+    if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            performSearch();
+        });
+    } else {
         if (searchBtn) searchBtn.addEventListener('click', performSearch);
-        
         if (searchInput) {
-            searchInput.addEventListener('keypress', (e) => {
+            searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     performSearch();
                 }
             });
         }
-
-        if (queryTypeBtns) {
-            queryTypeBtns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    queryTypeBtns.forEach(b => b.classList.remove('active'));
-                    const target = e.currentTarget;
-                    target.classList.add('active');
-                    activeQueryType = target.dataset.type || target.textContent.trim().toUpperCase();
-                    
-                    // Update placeholder based on type
-                    if (searchInput) {
-                        if (activeQueryType === 'KIS') {
-                            searchInput.placeholder = 'Nhập truy vấn (Tiếng Việt / English)... VD: a man in a red shirt / người đàn ông áo đỏ';
-                        } else if (activeQueryType === 'QA') {
-                            searchInput.placeholder = 'Nhập câu hỏi (VIE / ENG)... VD: What is the man doing? / Người đó làm gì?';
-                        } else if (activeQueryType === 'TRAKE') {
-                            searchInput.placeholder = 'Nhập truy vấn tracking (VIE / ENG)... VD: Step 1: running, Step 2: jumping';
-                        }
-                    }
-                });
-            });
-        }
-
-        if (retryBtn) retryBtn.addEventListener('click', performSearch);
-
-        // Image error delegation
-        if (resultsGrid) {
-            resultsGrid.addEventListener('error', (e) => {
-                if (e.target.tagName && e.target.tagName.toLowerCase() === 'img') {
-                    handleImageError(e.target);
-                }
-            }, true);
-        }
     }
 
-    /**
-     * Handles search execution
-     */
-    async function performSearch() {
-        if (!searchInput) return;
-        
-        const query = searchInput.value.trim();
-        if (!query) {
-            showError('Vui lòng nhập nội dung tìm kiếm');
-            return;
+    if (queryTypeBtns) {
+        queryTypeBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const target = e.currentTarget;
+                const type = target.dataset.type || target.textContent.trim().toUpperCase();
+                window.switchTrack(type);
+            });
+        });
+    }
+
+    if (retryBtn) retryBtn.addEventListener('click', performSearch);
+
+    // Image error delegation
+    if (resultsGrid) {
+        resultsGrid.addEventListener('error', (e) => {
+            if (e.target.tagName && e.target.tagName.toLowerCase() === 'img') {
+                handleImageError(e.target);
+            }
+        }, true);
+    }
+}
+window.performSearch = performSearch;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+
+let searchProgressTimer = null;
+
+/**
+ * Handles search execution
+ */
+async function performSearch() {
+    if (!searchInput) searchInput = document.getElementById('search-input');
+    if (!searchBtn) searchBtn = document.getElementById('search-btn');
+    if (!loadingState) loadingState = document.getElementById('loading-state');
+    const loadingStatusText = document.getElementById('loading-status-text');
+    if (!errorState) errorState = document.getElementById('error-state');
+    if (!resultsContainer) resultsContainer = document.getElementById('results-container');
+    if (!resultsGrid) resultsGrid = document.getElementById('results-grid');
+    if (!searchInput) return;
+    
+    const query = searchInput.value.trim();
+    console.log('[EBT Search UI] Triggered search:', { query, activeQueryType });
+    if (!query) {
+        showError('Vui lòng nhập nội dung tìm kiếm');
+        return;
+    }
+
+    // UI updates for loading
+    if (searchBtn) {
+        searchBtn.disabled = true;
+        searchBtn.classList.add('loading');
+    }
+    if (loadingState) loadingState.style.display = 'flex';
+    if (errorState) errorState.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'none';
+    if (resultsGrid) resultsGrid.innerHTML = '';
+
+    // Stage progression animation
+    const stages = [
+        "Đang phân tích câu truy vấn (Gemini NLP Compiler)...",
+        "Đang truy vết không gian đặc trưng SigLIP2 & FAISS...",
+        "Đang đối soát nhận diện đối tượng & bộ lọc không gian...",
+        "Đang tinh chỉnh xếp hạng & tổng hợp kết quả..."
+    ];
+    let stageIdx = 0;
+    if (loadingStatusText) loadingStatusText.textContent = stages[0];
+    clearInterval(searchProgressTimer);
+    searchProgressTimer = setInterval(() => {
+        stageIdx = (stageIdx + 1) % stages.length;
+        if (loadingStatusText) loadingStatusText.textContent = stages[stageIdx];
+    }, 2500);
+
+    let endpoint = '/api/v1/search/kis';
+    let requestBody = {
+        query: query,
+        query_type: activeQueryType,
+        top_k: 100
+    };
+
+    if (activeQueryType === 'QA') {
+        requestBody.question = query;
+    }
+
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+            const errJson = await response.json().catch(() => null);
+            const errDetail = errJson && errJson.detail ? errJson.detail : `${response.status} ${response.statusText}`;
+            throw new Error(`Lỗi Server: ${errDetail}`);
         }
 
-        // UI updates for loading
+        const data = await response.json();
+        renderResults(data);
+    } catch (error) {
+        console.error('Search error:', error);
+        if (DEMO_MODE) {
+            console.info('Falling back to demo mode data...');
+            renderResults(getDemoData(query, activeQueryType));
+        } else {
+            showError('Không thể thực hiện truy vấn: ' + error.message);
+        }
+    } finally {
+        clearInterval(searchProgressTimer);
         if (searchBtn) {
-            searchBtn.disabled = true;
-            searchBtn.classList.add('loading');
+            searchBtn.disabled = false;
+            searchBtn.classList.remove('loading');
         }
-        if (loadingState) loadingState.style.display = 'flex';
-        if (errorState) errorState.style.display = 'none';
-        if (resultsContainer) resultsContainer.style.display = 'none';
-        if (resultsGrid) resultsGrid.innerHTML = '';
-
-        // Fix: chọn đúng endpoint + đúng shape payload theo từng loại query
-        let endpoint = '/api/v1/search/kis';
-        let requestBody = {
-            query: query,
-            query_type: activeQueryType,
-            top_k: 100
-        };
-
-        if (activeQueryType === 'QA') {
-            endpoint = '/api/v1/search/qa';
-            requestBody = {
-                query: query,      // TODO: tách ô riêng "Mô tả sự kiện" nếu nhóm quyết định thêm lại ô thứ 2
-                question: query,   // TODO: tách ô riêng "Câu hỏi" — hiện dùng chung 1 ô nên query == question
-                top_k: 5
-            };
-        }
-        // TRAKE tạm thời vẫn gọi /search/kis như cũ (chưa xác nhận schema thật của trake_routes.py)
-
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            });
-
-            if (!response.ok) {
-                throw new Error(`Lỗi Server: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-
-            if (activeQueryType === 'QA') {
-                renderQAResult(data);
-            } else {
-                renderResults(data);
-            }
-        } catch (error) {
-            console.error('Search error:', error);
-            if (DEMO_MODE) {
-                console.info('Falling back to demo mode data...');
-                if (activeQueryType === 'QA') {
-                    renderQAResult(getDemoQAData(query));
-                } else {
-                    renderResults(getDemoData(query, activeQueryType));
-                }
-            } else {
-                showError('Không thể kết nối đến máy chủ. Vui lòng thử lại sau. ' + error.message);
-            }
-        } finally {
-            if (searchBtn) {
-                searchBtn.disabled = false;
-                searchBtn.classList.remove('loading');
-            }
-            if (loadingState) loadingState.style.display = 'none';
-        }
+        if (loadingState) loadingState.style.display = 'none';
     }
+}
 
     /**
      * Renders the search results
@@ -244,6 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         Answer: ${escapeHtml(result.vqa_answer)}
                      </div>` : '';
 
+                const trakeSegmentHtml = (data.query_type === 'TRAKE' && result.start_frame !== undefined) ?
+                    `<div style="margin-top: 8px; padding: 6px; background-color: #fef08a; color: #854d0e; border-left: 3px solid #eab308; border-radius: 4px; font-weight: bold; font-size: 0.9em;">
+                        TRAKE Segment: [${result.start_frame}, ${result.end_frame}]
+                     </div>` : '';
 
                 card.innerHTML = `
                     <div class="card-image-container">
@@ -257,19 +321,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         ${videoTitleHtml}
                         ${vqaAnswerHtml}
+                        ${trakeSegmentHtml}
                         <div class="tester-verify-container">
                             ${watchUrlHtml}
                         </div>
                         
                         <div class="feedback-actions" style="margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap;">
-                            <button class="feedback-btn match-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #15803d; color: white; border: 1px solid #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">✅ Match</button>
-                            <button class="feedback-btn uncertain-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'UNCERTAIN', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b45309; color: white; border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">⚠️ Không chắc</button>
-                            <button class="feedback-btn mismatch-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MISMATCH', ${result.clip_score || 0}, ${result.obj_score || 0}, ${result.spatial_score || 0}, ${result.fusion_score || 0}, this)" style="background: #b91c1c; color: white; border: 1px solid #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">❌ Mismatch</button>
+                            <button class="feedback-btn match-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MATCH', ${result.siglip_score ?? 0}, ${result.obj_score ?? 0}, ${result.spatial_score ?? 0}, ${result.fusion_score ?? 0}, this, '${(data.query || '').replace(/'/g, "\\\\'")}')" style="background: #15803d; color: white; border: 1px solid #22c55e; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">✅ Match</button>
+                            <button class="feedback-btn uncertain-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'UNCERTAIN', ${result.siglip_score ?? 0}, ${result.obj_score ?? 0}, ${result.spatial_score ?? 0}, ${result.fusion_score ?? 0}, this, '${(data.query || '').replace(/'/g, "\\\\'")}')" style="background: #b45309; color: white; border: 1px solid #f59e0b; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">⚠️ Không chắc</button>
+                            <button class="feedback-btn mismatch-btn" onclick="submitFeedback('${data.query_id}', '${result.video_id}', ${result.frame_idx}, 'MISMATCH', ${result.siglip_score ?? 0}, ${result.obj_score ?? 0}, ${result.spatial_score ?? 0}, ${result.fusion_score ?? 0}, this, '${(data.query || '').replace(/'/g, "\\\\'")}')" style="background: #b91c1c; color: white; border: 1px solid #ef4444; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; font-weight: 600; cursor: pointer;">❌ Mismatch</button>
                         </div>
                         
                         <div class="scores-container">
                             ${createScoreBar('Fusion', result.fusion_score, 1.0, 'fusion-bar')}
-                            ${createScoreBar('CLIP', result.clip_score, 1.0, 'clip-bar')}
+                            ${createScoreBar('SIGLIP', result.siglip_score ?? 0.0, 0.3, 'clip-bar')}
                             ${createScoreBar('Object', result.obj_score, 1.0, 'obj-bar')}
                             ${createScoreBar('Spatial', result.spatial_score || 0.0, 1.0, 'spatial-bar')}
                         </div>
@@ -283,83 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Trigger animations for bars
-        setTimeout(() => {
-            const progressBars = document.querySelectorAll('.progress-fill');
-            progressBars.forEach(bar => {
-                bar.style.width = bar.dataset.width || '0%';
-            });
-        }, 100);
-    }
-
-    /**
-     * Renders QA result — shape khác hẳn KIS/TRAKE: {answer, evidence} thay vì {results}
-     */
-    function renderQAResult(data) {
-        if (!data || !data.evidence || data.evidence.length === 0) {
-            showError('Không tìm thấy bằng chứng phù hợp cho câu hỏi này');
-            return;
-        }
-
-        if (resultsContainer) resultsContainer.style.display = 'block';
-
-        // Chuẩn hóa lại thành shape giống results để tái dùng exportSubmissionCSV() có sẵn
-        window.currentQueryData = {
-            query_id: data.query_id,
-            query_type: 'QA',
-            answer: data.answer,
-            results: data.evidence.map(e => ({
-                ...e,
-                vqa_answer: data.answer,
-                fusion_score: e.clip_score || 0
-            }))
-        };
-
-        if (summaryBar) {
-            summaryBar.innerHTML = `
-                <div class="summary-item">
-                    <span class="summary-label">Câu trả lời:</span>
-                    <span class="summary-value" style="font-weight:bold;">${escapeHtml(data.answer)}</span>
-                </div>
-                <div class="summary-item">
-                    <span class="summary-label">Thời gian:</span>
-                    <span class="summary-value">${formatTime(data.latency_ms || 0)}</span>
-                </div>
-                <div class="summary-item" style="margin-left: auto;">
-                    <button class="secondary-btn" onclick="exportSubmissionCSV()" style="padding: 4px 12px; font-size: 0.85em; background: #0284c7; color: #fff; border:none; border-radius: 4px; cursor: pointer;">⬇️ Xuất CSV (AIC Format)</button>
-                </div>
-            `;
-        }
-
-        if (parsedInfoContainer) parsedInfoContainer.style.display = 'none';
-
-        if (resultsGrid) {
-            data.evidence.forEach((e, index) => {
-                const card = document.createElement('div');
-                card.className = 'result-card';
-                card.style.animationDelay = `${index * 0.05}s`;
-
-                card.innerHTML = `
-                    <div class="card-image-container">
-                        <span class="rank-badge rank-default">#${e.rank}</span>
-                        <img src="${escapeHtml(e.frame_url)}" alt="Frame ${e.frame_idx}" class="frame-image" data-video="${escapeHtml(e.video_id)}" loading="lazy">
-                    </div>
-                    <div class="card-content">
-                        <div class="card-header">
-                            <h3 class="video-id">${escapeHtml(e.video_id)}</h3>
-                            <span class="frame-idx">Frame #${e.frame_idx}</span>
-                        </div>
-                        <div class="tester-verify-container">
-                            <span class="tester-verify-btn disabled">⏱️ ${escapeHtml(e.timestamp || '00:00')}</span>
-                        </div>
-                        <div class="scores-container">
-                            ${createScoreBar('CLIP', e.clip_score, 1.0, 'clip-bar')}
-                        </div>
-                    </div>
-                `;
-                resultsGrid.appendChild(card);
-            });
-        }
-
         setTimeout(() => {
             const progressBars = document.querySelectorAll('.progress-fill');
             progressBars.forEach(bar => {
@@ -480,41 +468,18 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    /**
-     * Generates demo QA data — đúng shape {answer, evidence} cho renderQAResult()
-     */
-    function getDemoQAData(query) {
-        const evidence = [];
-        for (let i = 1; i <= 5; i++) {
-            evidence.push({
-                rank: i,
-                video_id: `L25_V${String(Math.floor(Math.random() * 100)).padStart(3, '0')}`,
-                frame_idx: Math.floor(Math.random() * 30000),
-                timestamp: '00:00',
-                frame_url: 'non_existent_image_to_trigger_fallback.jpg',
-                clip_score: Math.random() * 0.4 + 0.1
-            });
-        }
-        return {
-            query_id: `demo_qa_${Math.random().toString(36).substr(2, 9)}`,
-            answer: '[DEMO] Chưa có kết quả thật — đây là câu trả lời giả lập vì backend chưa sẵn sàng',
-            latency_ms: Math.random() * 500 + 50,
-            evidence: evidence
-        };
-    }
-});
-
 /**
  * Global Handler for User Feedback / Ground Truth Annotation
  */
-window.submitFeedback = async function(queryId, videoId, frameIdx, verdict, clipScore, objScore, spatialScore, fusionScore, btnElement) {
+window.submitFeedback = async function(queryId, videoId, frameIdx, verdict, siglipScore, objScore, spatialScore, fusionScore, btnElement, queryText = "") {
     try {
         const payload = {
             query_id: queryId,
+            query_text: queryText || "",
             video_id: videoId,
             frame_idx: frameIdx,
             verdict: verdict,
-            clip_score: clipScore,
+            siglip_score: siglipScore,
             obj_score: objScore,
             spatial_score: spatialScore,
             fusion_score: fusionScore
@@ -560,14 +525,21 @@ window.exportSubmissionCSV = function() {
     
     let csvContent = "";
     if (data.query_type === 'QA') {
-        csvContent = "video_id,frame_idx,answer\n";
+        // AIC QA Format: <video_id>,<frame_idx>,"<answer>" (No header)
         data.results.forEach(r => {
-            csvContent += `${r.video_id},${r.frame_idx},${r.vqa_answer || ""}\n`;
+            const ans = (r.vqa_answer || "").replace(/"/g, '""');
+            csvContent += `${r.video_id},${r.frame_idx},"${ans}"\r\n`;
+        });
+    } else if (data.query_type === 'TRAKE') {
+        // AIC TRAKE Format: <video_id>,<e1>,<e2>,<e3>,<e4> (No header)
+        data.results.forEach(r => {
+            const f = r.frame_idx || 0;
+            csvContent += `${r.video_id},${f},${f+25},${f+50},${f+75}\r\n`;
         });
     } else {
-        csvContent = "video_id,frame_idx,rank,fusion_score\n";
+        // AIC KIS Format: <video_id>,<frame_idx> (No header)
         data.results.forEach(r => {
-            csvContent += `${r.video_id},${r.frame_idx},${r.rank},${(r.fusion_score || 0).toFixed(4)}\n`;
+            csvContent += `${r.video_id},${r.frame_idx}\r\n`;
         });
     }
     

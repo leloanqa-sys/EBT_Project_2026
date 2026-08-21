@@ -1,6 +1,15 @@
 import time
 import uuid
+import sys
+import os
+import base64
 from typing import List, Dict, Optional
+
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if os.path.join(PROJECT_ROOT, "tools") not in sys.path:
+    sys.path.insert(0, os.path.join(PROJECT_ROOT, "tools"))
+from tools.review_tool import resolve_keyframe_b64
+
 from src.common.schemas import CandidateFrame
 from src.pipeline import MVPPipeline, PipelineResult
 from src.role_c_logic.vlm_client import GeminiVisionClient
@@ -44,18 +53,10 @@ class QAPipeline:
         b64_str = None
         
         try:
-            import sys
-            import os
-            PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-            sys.path.insert(0, os.path.join(PROJECT_ROOT, "tools"))
-            
-            from tools.review_tool import resolve_keyframe_b64
-            import base64
-            
             vid = best_candidate.video_id
             fidx = best_candidate.frame_idx
             
-            b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(vid, fidx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"))
+            b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(vid, fidx, keyframes_root=os.path.join(PROJECT_ROOT, "data", "raw", "keyframes"), allow_remote=True)
             if b64_str:
                 image_bytes = base64.b64decode(b64_str.split(",")[1])
                         

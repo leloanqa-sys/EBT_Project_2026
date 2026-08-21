@@ -94,14 +94,25 @@ def create_deterministic_plan(ir: VisualIRGraph) -> ExecutionPlan:
     # 5. EVENTS (Abstract Actions)
     for ev in ir.events:
         op_event = registry.get_operator("EVENT_ACTION")
-        plan.steps.append(PlanStep(
-            step_id=step_counter,
-            operator_name="EVENT_ACTION",
-            target=ev.id,
-            args={"action": ev.action, "participants": ev.participants, "polarity": ev.polarity.value},
-            status=op_event.status if op_event else CapabilityStatus.UNSUPPORTED
-        ))
-        plan.has_unsupported = True # Currently unsupported
+        if op_event and op_event.status in (CapabilityStatus.EXPERIMENTAL, CapabilityStatus.DEFER):
+            # Mount to VLM_VERIFY Adapter
+            plan.steps.append(PlanStep(
+                step_id=step_counter,
+                operator_name="VLM_VERIFY",
+                target=ev.id,
+                args={"action": ev.action, "participants": ev.participants, "polarity": ev.polarity.value, "reason": "action_recognition"},
+                status=CapabilityStatus.READY
+            ))
+        else:
+            plan.steps.append(PlanStep(
+                step_id=step_counter,
+                operator_name="EVENT_ACTION",
+                target=ev.id,
+                args={"action": ev.action, "participants": ev.participants, "polarity": ev.polarity.value},
+                status=op_event.status if op_event else CapabilityStatus.UNSUPPORTED
+            ))
+            if op_event is None or op_event.status == CapabilityStatus.UNSUPPORTED:
+                plan.has_unsupported = True
         step_counter += 1
         
     return plan

@@ -18,6 +18,10 @@ from pydantic import BaseModel, Field
 
 # ── Resolve project root ──
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT / "tools") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "tools"))
+from tools.review_tool import resolve_keyframe_b64
+import base64
 sys.path.insert(0, str(PROJECT_ROOT))
 
 router = APIRouter(tags=["search"])
@@ -37,7 +41,7 @@ class ResultItem(BaseModel):
     rank: int
     video_id: str
     frame_idx: int
-    clip_score: float
+    siglip_score: float
     obj_score: float
     fusion_score: float
     pts_time: float = 0.0
@@ -47,7 +51,8 @@ class ResultItem(BaseModel):
     watch_url: Optional[str] = None
     video_title: Optional[str] = None
     vqa_answer: Optional[str] = None
-
+    start_frame: Optional[int] = None
+    end_frame: Optional[int] = None
 
 class ParsedInfo(BaseModel):
     normalized_text: str = ""
@@ -93,17 +98,22 @@ def get_frame_image(video_id: str, frame_idx: int):
     Resolve frame image dynamically from .zip or .mp4 files using tools logic.
     """
     try:
-        sys.path.insert(0, str(PROJECT_ROOT / "tools"))
-        from tools.review_tool import resolve_keyframe_b64
-        import base64
-        
-        b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(video_id, frame_idx, keyframes_root=str(PROJECT_ROOT / "data" / "raw" / "keyframes"))
+        b64_str, keyframe_n, expected_fname = resolve_keyframe_b64(
+            video_id,
+            frame_idx,
+            keyframes_root=str(PROJECT_ROOT / "data" / "raw" / "keyframes"),
+            allow_remote=False
+        )
         
         if b64_str:
             # b64_str is like "data:image/jpeg;base64,....."
             img_data = base64.b64decode(b64_str.split(",")[1])
             mime_type = b64_str.split(";")[0].split(":")[1]
-            return Response(content=img_data, media_type=mime_type)
+            return Response(
+                content=img_data,
+                media_type=mime_type,
+                headers={"Cache-Control": "public, max-age=86400"}
+            )
             
     except Exception as e:
         print(f"[API] Image resolver error: {e}")
@@ -134,6 +144,11 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
     result = pipeline.run(query_id, query, query_type, question=question)
     
     elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    # Read inferred query_type from IR Graph
+    inferred_type = query_type
+    if result.operator_trace and "ir_graph" in result.operator_trace:
+        inferred_type = result.operator_trace["ir_graph"].get("query_type", query_type)
 
     # Build response format
     results = []
@@ -175,11 +190,18 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
         fusion_score = c_obj.fusion_score
         has_target_objects = len(target_objs) > 0
 
+        # Simulate TRAKE segments based on KIS frame
+        start_frame = None
+        end_frame = None
+        if inferred_type == "TRAKE":
+            start_frame = max(0, c_obj.frame_idx - 75)
+            end_frame = c_obj.frame_idx + 75
+
         results.append({
             "rank": rank,
             "video_id": c_obj.video_id,
             "frame_idx": c_obj.frame_idx,
-            "clip_score": round(c_obj.clip_score, 4),
+            "siglip_score": round(c_obj.siglip_score, 4),
             "obj_score": round(obj_score, 4),
             "spatial_score": round(getattr(c_obj, 'spatial_score', 0.0), 4),
             "fusion_score": round(fusion_score, 4),
@@ -191,6 +213,8 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
             "video_title": v_title,
             "detected_labels": detected_labels,
             "vqa_answer": getattr(c_obj, 'vqa_answer', None),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
         })
 
     # Prepare extracted info for UI based on trace (we didn't pass the raw IR graph back in MVP result yet, so mock it for UI)
@@ -203,7 +227,7 @@ def _run_real_search(query: str, query_type: str, top_k: int, question: Optional
     return {
         "query_id": query_id,
         "query": query,
-        "query_type": query_type,
+        "query_type": inferred_type,
         "total_results": len(results),
         "search_time_ms": round(elapsed_ms, 1),
         "cache_hit": False,
@@ -227,12 +251,17 @@ async def search_kis(req: SearchRequest):
     """
     from fastapi.concurrency import run_in_threadpool
     try:
+        # If QA, the query itself is the question
+        question_text = req.question
+        if req.query_type in ("QA", "TRAKE") and not question_text:
+            question_text = req.query
+            
         result = await run_in_threadpool(
             _run_real_search,
             query=req.query,
             query_type=req.query_type,
             top_k=req.top_k,
-            question=req.question,
+            question=question_text,
         )
     except Exception as e:
         print(f"[API] Pipeline error: {e}")

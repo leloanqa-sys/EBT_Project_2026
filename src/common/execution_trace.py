@@ -47,11 +47,18 @@ class TraceLogger:
             json.dump(asdict(trace), f, ensure_ascii=False, indent=2)
             
     def print_trace_summary(self, trace: ExecutionTraceLog):
-        print(f"\n=== TRACE SUMMARY: {trace.query_id} ===")
-        print(f"Query: {trace.query_text}")
-        print(f"Candidates: {trace.initial_candidates} -> {trace.final_candidates}")
-        print(f"Total Latency: {trace.total_latency_ms:.1f}ms")
-        print("Operator Steps:")
-        for op in trace.operator_traces:
-            print(f"  - {op.operator_name}({op.target}) [{op.status}]: {op.candidates_in} -> {op.candidates_out} ({op.latency_ms:.1f}ms)")
-        print("===================================\n")
+        try:
+            print(f"\n=== TRACE SUMMARY: {trace.query_id} ===")
+            safe_text = str(trace.query_text).encode("utf-8", errors="replace").decode("utf-8")
+            try:
+                print(f"Query: {trace.query_text}")
+            except UnicodeEncodeError:
+                print(f"Query: {trace.query_text.encode('ascii', errors='replace').decode('ascii')}")
+            print(f"Candidates: {trace.initial_candidates} -> {trace.final_candidates}")
+            print(f"Total Latency: {trace.total_latency_ms:.1f}ms")
+            print("Operator Steps:")
+            for op in trace.operator_traces:
+                print(f"  - {op.operator_name}({op.target}) [{op.status}]: {op.candidates_in} -> {op.candidates_out} ({op.latency_ms:.1f}ms)")
+            print("===================================\n")
+        except Exception:
+            pass

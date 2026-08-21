@@ -102,7 +102,7 @@ def get_frame_image(video_id: str, frame_idx: int):
             video_id,
             frame_idx,
             keyframes_root=str(PROJECT_ROOT / "data" / "raw" / "keyframes"),
-            allow_remote=False
+            allow_remote=True
         )
         
         if b64_str:

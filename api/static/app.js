@@ -24,6 +24,20 @@ function init() {
 
     setupEventListeners();
     checkSystemStatus();
+
+    // Check for query parameters to auto-run search
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlQuery = urlParams.get('query');
+    const urlType = urlParams.get('type');
+    if (urlType) {
+        window.switchTrack(urlType.toUpperCase());
+    }
+    if (urlQuery) {
+        searchInput.value = urlQuery;
+        // Wait briefly for UI and connection to settle, then run search
+        setTimeout(performSearch, 300);
+    }
+
     console.log('[EBT Search UI] Initialized successfully. Ready for queries.');
 }
 

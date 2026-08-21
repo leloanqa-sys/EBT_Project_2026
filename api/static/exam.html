@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bộ Đề Thi Chính Thức - EBT Vision Search</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f111a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h1 {
+            margin: 0;
+            background: linear-gradient(to right, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2rem;
+        }
+        .back-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #94a3b8;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        .back-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        .card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+        .q-badge {
+            font-family: 'JetBrains Mono', monospace;
+            background: #1e293b;
+            color: #3b82f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            min-width: 60px;
+            text-align: center;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+        .type-badge {
+            font-family: 'JetBrains Mono', monospace;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        .type-KIS {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .type-QA {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+        .type-TRAKE {
+            background: rgba(139, 92, 246, 0.1);
+            color: #8b5cf6;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        .content {
+            flex-grow: 1;
+        }
+        .text {
+            font-size: 1.05rem;
+            margin: 10px 0;
+            color: #f1f5f9;
+        }
+        .meta-info {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .action-area {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-self: center;
+        }
+        .btn {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Bộ Đề Thi Chính Thức (Sơ Tuyển 1)</h1>
+                <p style="color: #94a3b8; margin: 5px 0 0 0;">Danh sách 25 câu hỏi đã được trích xuất từ SOTUYEN1-bo-de-thi.zip</p>
+            </div>
+            <a href="index.html" class="back-btn">← Trang tìm kiếm</a>
+        </header>
+
+        <div class="grid">
+
+            <div class="card">
+                <div class="q-badge">#1</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Cảnh quay một nhóm hơn 5 người xếp thành hàng tập thể dục, cùng thực hiện động tác hai tay chạm mũi chân. Trong nhóm chỉ có một người đeo kính và ba người đội nón có màu đỏ.</div>
+                    <div class="meta-info">File: query-p1-1-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=C%E1%BA%A3nh%20quay%20m%E1%BB%99t%20nh%C3%B3m%20h%C6%A1n%205%20ng%C6%B0%E1%BB%9Di%20x%E1%BA%BFp%20th%C3%A0nh%20h%C3%A0ng%20t%E1%BA%ADp%20th%E1%BB%83%20d%E1%BB%A5c%2C%20c%C3%B9ng%20th%E1%BB%B1c%20hi%E1%BB%87n%20%C4%91%E1%BB%99ng%20t%C3%A1c%20hai%20tay%20ch%E1%BA%A1m%20m%C5%A9i%20ch%C3%A2n.%20Trong%20nh%C3%B3m%20ch%E1%BB%89%20c%C3%B3%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91eo%20k%C3%ADnh%20v%C3%A0%20ba%20ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BB%99i%20n%C3%B3n%20c%C3%B3%20m%C3%A0u%20%C4%91%E1%BB%8F.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#2</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn phim bắt đầu bằng một bản đồ, trên đó một loại công trình thủy lợi lần lượt xuất hiện bốn lần. Sau đó chuyển sang cảnh một con đập được quay từ trên cao, tiếp đến là cảnh cận con đập dưới trời mưa.</div>
+                    <div class="meta-info">File: query-p1-2-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20phim%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20b%E1%BA%B1ng%20m%E1%BB%99t%20b%E1%BA%A3n%20%C4%91%E1%BB%93%2C%20tr%C3%AAn%20%C4%91%C3%B3%20m%E1%BB%99t%20lo%E1%BA%A1i%20c%C3%B4ng%20tr%C3%ACnh%20th%E1%BB%A7y%20l%E1%BB%A3i%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20xu%E1%BA%A5t%20hi%E1%BB%87n%20b%E1%BB%91n%20l%E1%BA%A7n.%20Sau%20%C4%91%C3%B3%20chuy%E1%BB%83n%20sang%20c%E1%BA%A3nh%20m%E1%BB%99t%20con%20%C4%91%E1%BA%ADp%20%C4%91%C6%B0%E1%BB%A3c%20quay%20t%E1%BB%AB%20tr%C3%AAn%20cao%2C%20ti%E1%BA%BFp%20%C4%91%E1%BA%BFn%20l%C3%A0%20c%E1%BA%A3nh%20c%E1%BA%ADn%20con%20%C4%91%E1%BA%ADp%20d%C6%B0%E1%BB%9Bi%20tr%E1%BB%9Di%20m%C6%B0a.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#3</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Hình ảnh một con cá được đặt lên cân, sau đó có cảnh một con cá khác cùng loại bị một người cầm đuôi. Con số hiển thị cuối cùng trên cân là bao nhiêu?</div>
+                    <div class="meta-info">File: query-p1-3-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=H%C3%ACnh%20%E1%BA%A3nh%20m%E1%BB%99t%20con%20c%C3%A1%20%C4%91%C6%B0%E1%BB%A3c%20%C4%91%E1%BA%B7t%20l%C3%AAn%20c%C3%A2n%2C%20sau%20%C4%91%C3%B3%20c%C3%B3%20c%E1%BA%A3nh%20m%E1%BB%99t%20con%20c%C3%A1%20kh%C3%A1c%20c%C3%B9ng%20lo%E1%BA%A1i%20b%E1%BB%8B%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20c%E1%BA%A7m%20%C4%91u%C3%B4i.%20Con%20s%E1%BB%91%20hi%E1%BB%83n%20th%E1%BB%8B%20cu%E1%BB%91i%20c%C3%B9ng%20tr%C3%AAn%20c%C3%A2n%20l%C3%A0%20bao%20nhi%C3%AAu%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#4</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Một đàn sư tử đang nghỉ ngơi và leo trèo trên các bục gỗ trong khu nuôi dưỡng, phía trước có bảng thông tin của London Zoo phục vụ công tác theo dõi và bảo tồn động vật.. Sau đó có cảnh hai nhân viên mặc áo xanh lá đang cân và ghi nhận số liệu của một con vật trong khuôn viên sở thú.</div>
+                    <div class="meta-info">File: query-p1-4-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=M%E1%BB%99t%20%C4%91%C3%A0n%20s%C6%B0%20t%E1%BB%AD%20%C4%91ang%20ngh%E1%BB%89%20ng%C6%A1i%20v%C3%A0%20leo%20tr%C3%A8o%20tr%C3%AAn%20c%C3%A1c%20b%E1%BB%A5c%20g%E1%BB%97%20trong%20khu%20nu%C3%B4i%20d%C6%B0%E1%BB%A1ng%2C%20ph%C3%ADa%20tr%C6%B0%E1%BB%9Bc%20c%C3%B3%20b%E1%BA%A3ng%20th%C3%B4ng%20tin%20c%E1%BB%A7a%20London%20Zoo%20ph%E1%BB%A5c%20v%E1%BB%A5%20c%C3%B4ng%20t%C3%A1c%20theo%20d%C3%B5i%20v%C3%A0%20b%E1%BA%A3o%20t%E1%BB%93n%20%C4%91%E1%BB%99ng%20v%E1%BA%ADt..%20Sau%20%C4%91%C3%B3%20c%C3%B3%20c%E1%BA%A3nh%20hai%20nh%C3%A2n%20vi%C3%AAn%20m%E1%BA%B7c%20%C3%A1o%20xanh%20l%C3%A1%20%C4%91ang%20c%C3%A2n%20v%C3%A0%20ghi%20nh%E1%BA%ADn%20s%E1%BB%91%20li%E1%BB%87u%20c%E1%BB%A7a%20m%E1%BB%99t%20con%20v%E1%BA%ADt%20trong%20khu%C3%B4n%20vi%C3%AAn%20s%E1%BB%9F%20th%C3%BA.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#4</div>
+                <div class="content">
+                    <span class="type-badge type-TRAKE">TRAKE</span>
+                    <div class="text">E1: Khoảnh khắc đầu tiên bột được bỏ vào tô măng tây.
+E2: Khoảnh khắc đầu tiên thấy miến măng tây đầu tiên tiếp xúc với dầu trong chảo.
+E3: Khoảnh khắc miếng măng tây đầu tiên rời khỏi chảo dầu.
+E4: Khoảng khắc miếng măng tây cuối cùng rời chảo dầu và nằm hoàn toàn trên dĩa.</div>
+                    <div class="meta-info">File: query-p1-4-trake.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=E1%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20b%E1%BB%99t%20%C4%91%C6%B0%E1%BB%A3c%20b%E1%BB%8F%20v%C3%A0o%20t%C3%B4%20m%C4%83ng%20t%C3%A2y.%0AE2%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20th%E1%BA%A5y%20mi%E1%BA%BFn%20m%C4%83ng%20t%C3%A2y%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20ti%E1%BA%BFp%20x%C3%BAc%20v%E1%BB%9Bi%20d%E1%BA%A7u%20trong%20ch%E1%BA%A3o.%0AE3%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20mi%E1%BA%BFng%20m%C4%83ng%20t%C3%A2y%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20r%E1%BB%9Di%20kh%E1%BB%8Fi%20ch%E1%BA%A3o%20d%E1%BA%A7u.%0AE4%3A%20Kho%E1%BA%A3ng%20kh%E1%BA%AFc%20mi%E1%BA%BFng%20m%C4%83ng%20t%C3%A2y%20cu%E1%BB%91i%20c%C3%B9ng%20r%E1%BB%9Di%20ch%E1%BA%A3o%20d%E1%BA%A7u%20v%C3%A0%20n%E1%BA%B1m%20ho%C3%A0n%20to%C3%A0n%20tr%C3%AAn%20d%C4%A9a.&type=TRAKE" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#5</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn clip bắt đầu bằng việc đậu hà lan được bỏ vào với mực đang được xào trên chảo, bên cạnh là đĩa hành tây và ớt đỏ thái lát chuẩn bị cho vào món ăn. Đoạn clip kết thúc với khung quay chậm (slow motion) cảnh lắc chảo trên bếp lửa.</div>
+                    <div class="meta-info">File: query-p1-5-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20clip%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20b%E1%BA%B1ng%20vi%E1%BB%87c%20%C4%91%E1%BA%ADu%20h%C3%A0%20lan%20%C4%91%C6%B0%E1%BB%A3c%20b%E1%BB%8F%20v%C3%A0o%20v%E1%BB%9Bi%20m%E1%BB%B1c%20%C4%91ang%20%C4%91%C6%B0%E1%BB%A3c%20x%C3%A0o%20tr%C3%AAn%20ch%E1%BA%A3o%2C%20b%C3%AAn%20c%E1%BA%A1nh%20l%C3%A0%20%C4%91%C4%A9a%20h%C3%A0nh%20t%C3%A2y%20v%C3%A0%20%E1%BB%9Bt%20%C4%91%E1%BB%8F%20th%C3%A1i%20l%C3%A1t%20chu%E1%BA%A9n%20b%E1%BB%8B%20cho%20v%C3%A0o%20m%C3%B3n%20%C4%83n.%20%C4%90o%E1%BA%A1n%20clip%20k%E1%BA%BFt%20th%C3%BAc%20v%E1%BB%9Bi%20khung%20quay%20ch%E1%BA%ADm%20%28slow%20motion%29%20c%E1%BA%A3nh%20l%E1%BA%AFc%20ch%E1%BA%A3o%20tr%C3%AAn%20b%E1%BA%BFp%20l%E1%BB%ADa.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#6</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Mẩu tin bắt đầu với hình ảnh nột người đàn ông mặc vest xanh đậm, sơ mi trắng và cà vạt, đang ngồi trên một chiếc ghế lớn. Ông cầm bằng hai tay một khối đá quý thô khá lớn, đưa lên gần mặt để quan sát.
+Bên phải là một phụ nữ mặc trang phục công sở màu đen và khăn trùm đầu màu hồng tím, đang đứng cạnh và mỉm cười. Tiếp theo có hình ảnh toàn cảnh từ trên cao của một mỏ đá quý lộ thiên quy mô lớn với hố khai thác sâu nhiều tầng và hệ thống đường vận chuyển bao quanh.</div>
+                    <div class="meta-info">File: query-p1-6-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=M%E1%BA%A9u%20tin%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20v%E1%BB%9Bi%20h%C3%ACnh%20%E1%BA%A3nh%20n%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91%C3%A0n%20%C3%B4ng%20m%E1%BA%B7c%20vest%20xanh%20%C4%91%E1%BA%ADm%2C%20s%C6%A1%20mi%20tr%E1%BA%AFng%20v%C3%A0%20c%C3%A0%20v%E1%BA%A1t%2C%20%C4%91ang%20ng%E1%BB%93i%20tr%C3%AAn%20m%E1%BB%99t%20chi%E1%BA%BFc%20gh%E1%BA%BF%20l%E1%BB%9Bn.%20%C3%94ng%20c%E1%BA%A7m%20b%E1%BA%B1ng%20hai%20tay%20m%E1%BB%99t%20kh%E1%BB%91i%20%C4%91%C3%A1%20qu%C3%BD%20th%C3%B4%20kh%C3%A1%20l%E1%BB%9Bn%2C%20%C4%91%C6%B0a%20l%C3%AAn%20g%E1%BA%A7n%20m%E1%BA%B7t%20%C4%91%E1%BB%83%20quan%20s%C3%A1t.%0AB%C3%AAn%20ph%E1%BA%A3i%20l%C3%A0%20m%E1%BB%99t%20ph%E1%BB%A5%20n%E1%BB%AF%20m%E1%BA%B7c%20trang%20ph%E1%BB%A5c%20c%C3%B4ng%20s%E1%BB%9F%20m%C3%A0u%20%C4%91en%20v%C3%A0%20kh%C4%83n%20tr%C3%B9m%20%C4%91%E1%BA%A7u%20m%C3%A0u%20h%E1%BB%93ng%20t%C3%ADm%2C%20%C4%91ang%20%C4%91%E1%BB%A9ng%20c%E1%BA%A1nh%20v%C3%A0%20m%E1%BB%89m%20c%C6%B0%E1%BB%9Di.%20Ti%E1%BA%BFp%20theo%20c%C3%B3%20h%C3%ACnh%20%E1%BA%A3nh%20to%C3%A0n%20c%E1%BA%A3nh%20t%E1%BB%AB%20tr%C3%AAn%20cao%20c%E1%BB%A7a%20m%E1%BB%99t%20m%E1%BB%8F%20%C4%91%C3%A1%20qu%C3%BD%20l%E1%BB%99%20thi%C3%AAn%20quy%20m%C3%B4%20l%E1%BB%9Bn%20v%E1%BB%9Bi%20h%E1%BB%91%20khai%20th%C3%A1c%20s%C3%A2u%20nhi%E1%BB%81u%20t%E1%BA%A7ng%20v%C3%A0%20h%E1%BB%87%20th%E1%BB%91ng%20%C4%91%C6%B0%E1%BB%9Dng%20v%E1%BA%ADn%20chuy%E1%BB%83n%20bao%20quanh.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#7</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn clip bắt đầu bằng cảnh cà rốt cắt hình ngôi sao đang được luộc trong nồi nước sôi, đặt trong rổ lưới kim loại và được đảo bằng đôi đũa gỗ. 
+Đoạn clip kết thúc bằng hình ảnh đĩa rau củ luộc và đồ chiên được trình bày đẹp mắt, gồm đậu bắp, súp lơ, cà rốt hình ngôi sao, bí xanh, chén nước chấm màu hồng ở giữa và đôi đũa màu hồng nhạt đặt bên phải</div>
+                    <div class="meta-info">File: query-p1-7-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20clip%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20b%E1%BA%B1ng%20c%E1%BA%A3nh%20c%C3%A0%20r%E1%BB%91t%20c%E1%BA%AFt%20h%C3%ACnh%20ng%C3%B4i%20sao%20%C4%91ang%20%C4%91%C6%B0%E1%BB%A3c%20lu%E1%BB%99c%20trong%20n%E1%BB%93i%20n%C6%B0%E1%BB%9Bc%20s%C3%B4i%2C%20%C4%91%E1%BA%B7t%20trong%20r%E1%BB%95%20l%C6%B0%E1%BB%9Bi%20kim%20lo%E1%BA%A1i%20v%C3%A0%20%C4%91%C6%B0%E1%BB%A3c%20%C4%91%E1%BA%A3o%20b%E1%BA%B1ng%20%C4%91%C3%B4i%20%C4%91%C5%A9a%20g%E1%BB%97.%20%0A%C4%90o%E1%BA%A1n%20clip%20k%E1%BA%BFt%20th%C3%BAc%20b%E1%BA%B1ng%20h%C3%ACnh%20%E1%BA%A3nh%20%C4%91%C4%A9a%20rau%20c%E1%BB%A7%20lu%E1%BB%99c%20v%C3%A0%20%C4%91%E1%BB%93%20chi%C3%AAn%20%C4%91%C6%B0%E1%BB%A3c%20tr%C3%ACnh%20b%C3%A0y%20%C4%91%E1%BA%B9p%20m%E1%BA%AFt%2C%20g%E1%BB%93m%20%C4%91%E1%BA%ADu%20b%E1%BA%AFp%2C%20s%C3%BAp%20l%C6%A1%2C%20c%C3%A0%20r%E1%BB%91t%20h%C3%ACnh%20ng%C3%B4i%20sao%2C%20b%C3%AD%20xanh%2C%20ch%C3%A9n%20n%C6%B0%E1%BB%9Bc%20ch%E1%BA%A5m%20m%C3%A0u%20h%E1%BB%93ng%20%E1%BB%9F%20gi%E1%BB%AFa%20v%C3%A0%20%C4%91%C3%B4i%20%C4%91%C5%A9a%20m%C3%A0u%20h%E1%BB%93ng%20nh%E1%BA%A1t%20%C4%91%E1%BA%B7t%20b%C3%AAn%20ph%E1%BA%A3i&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#8</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Người đầu bếp lần lượt đặt các miếng nguyên liệu dạng thanh và những lát cắt hình hoa vào một đĩa đang được hấp trong nồi.
+Các nguyên liệu được dùng đũa sắp xếp xen kẽ xung quanh phần thức ăn đã có sẵn trên đĩa.
+Sau đó, đầu bếp dùng muỗng lấy thêm một loại nguyên liệu mềm từ tô thủy tinh.
+Phần nguyên liệu này được đặt vào giữa đĩa, xung quanh là các miếng dạng thanh và hình hoa đã được sắp xếp trước đó.</div>
+                    <div class="meta-info">File: query-p1-8-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20%C4%91%E1%BA%B7t%20c%C3%A1c%20mi%E1%BA%BFng%20nguy%C3%AAn%20li%E1%BB%87u%20d%E1%BA%A1ng%20thanh%20v%C3%A0%20nh%E1%BB%AFng%20l%C3%A1t%20c%E1%BA%AFt%20h%C3%ACnh%20hoa%20v%C3%A0o%20m%E1%BB%99t%20%C4%91%C4%A9a%20%C4%91ang%20%C4%91%C6%B0%E1%BB%A3c%20h%E1%BA%A5p%20trong%20n%E1%BB%93i.%0AC%C3%A1c%20nguy%C3%AAn%20li%E1%BB%87u%20%C4%91%C6%B0%E1%BB%A3c%20d%C3%B9ng%20%C4%91%C5%A9a%20s%E1%BA%AFp%20x%E1%BA%BFp%20xen%20k%E1%BA%BD%20xung%20quanh%20ph%E1%BA%A7n%20th%E1%BB%A9c%20%C4%83n%20%C4%91%C3%A3%20c%C3%B3%20s%E1%BA%B5n%20tr%C3%AAn%20%C4%91%C4%A9a.%0ASau%20%C4%91%C3%B3%2C%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20d%C3%B9ng%20mu%E1%BB%97ng%20l%E1%BA%A5y%20th%C3%AAm%20m%E1%BB%99t%20lo%E1%BA%A1i%20nguy%C3%AAn%20li%E1%BB%87u%20m%E1%BB%81m%20t%E1%BB%AB%20t%C3%B4%20th%E1%BB%A7y%20tinh.%0APh%E1%BA%A7n%20nguy%C3%AAn%20li%E1%BB%87u%20n%C3%A0y%20%C4%91%C6%B0%E1%BB%A3c%20%C4%91%E1%BA%B7t%20v%C3%A0o%20gi%E1%BB%AFa%20%C4%91%C4%A9a%2C%20xung%20quanh%20l%C3%A0%20c%C3%A1c%20mi%E1%BA%BFng%20d%E1%BA%A1ng%20thanh%20v%C3%A0%20h%C3%ACnh%20hoa%20%C4%91%C3%A3%20%C4%91%C6%B0%E1%BB%A3c%20s%E1%BA%AFp%20x%E1%BA%BFp%20tr%C6%B0%E1%BB%9Bc%20%C4%91%C3%B3.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#9</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn clip là cảnh thu hoạch dứa ở miền Tây: một bà cụ ngồi bên giỏ dứa trò chuyện với cô gái mặc áo hồng quàng khăn rằn; xung quanh chất đầy dứa, phía sau có người phụ nữ đội nón lá cầm trái dứa và một chiếc ghe xanh đậu cạnh bờ, tạo không khí nông thôn mộc mạc, yên bình.</div>
+                    <div class="meta-info">File: query-p1-9-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20clip%20l%C3%A0%20c%E1%BA%A3nh%20thu%20ho%E1%BA%A1ch%20d%E1%BB%A9a%20%E1%BB%9F%20mi%E1%BB%81n%20T%C3%A2y%3A%20m%E1%BB%99t%20b%C3%A0%20c%E1%BB%A5%20ng%E1%BB%93i%20b%C3%AAn%20gi%E1%BB%8F%20d%E1%BB%A9a%20tr%C3%B2%20chuy%E1%BB%87n%20v%E1%BB%9Bi%20c%C3%B4%20g%C3%A1i%20m%E1%BA%B7c%20%C3%A1o%20h%E1%BB%93ng%20qu%C3%A0ng%20kh%C4%83n%20r%E1%BA%B1n%3B%20xung%20quanh%20ch%E1%BA%A5t%20%C4%91%E1%BA%A7y%20d%E1%BB%A9a%2C%20ph%C3%ADa%20sau%20c%C3%B3%20ng%C6%B0%E1%BB%9Di%20ph%E1%BB%A5%20n%E1%BB%AF%20%C4%91%E1%BB%99i%20n%C3%B3n%20l%C3%A1%20c%E1%BA%A7m%20tr%C3%A1i%20d%E1%BB%A9a%20v%C3%A0%20m%E1%BB%99t%20chi%E1%BA%BFc%20ghe%20xanh%20%C4%91%E1%BA%ADu%20c%E1%BA%A1nh%20b%E1%BB%9D%2C%20t%E1%BA%A1o%20kh%C3%B4ng%20kh%C3%AD%20n%C3%B4ng%20th%C3%B4n%20m%E1%BB%99c%20m%E1%BA%A1c%2C%20y%C3%AAn%20b%C3%ACnh.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#9</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Đoạn phim ghi lại cảnh những chiếc xe ô tô lội nước, chiếc xe màu vàng, màu đỏ và màu đen lần lượt chuẩn bị đi qua cầu. Con số được ghi trên biển báo bên trái của cây cầu là bao nhiêu?</div>
+                    <div class="meta-info">File: query-p1-9-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20phim%20ghi%20l%E1%BA%A1i%20c%E1%BA%A3nh%20nh%E1%BB%AFng%20chi%E1%BA%BFc%20xe%20%C3%B4%20t%C3%B4%20l%E1%BB%99i%20n%C6%B0%E1%BB%9Bc%2C%20chi%E1%BA%BFc%20xe%20m%C3%A0u%20v%C3%A0ng%2C%20m%C3%A0u%20%C4%91%E1%BB%8F%20v%C3%A0%20m%C3%A0u%20%C4%91en%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20chu%E1%BA%A9n%20b%E1%BB%8B%20%C4%91i%20qua%20c%E1%BA%A7u.%20Con%20s%E1%BB%91%20%C4%91%C6%B0%E1%BB%A3c%20ghi%20tr%C3%AAn%20bi%E1%BB%83n%20b%C3%A1o%20b%C3%AAn%20tr%C3%A1i%20c%E1%BB%A7a%20c%C3%A2y%20c%E1%BA%A7u%20l%C3%A0%20bao%20nhi%C3%AAu%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#10</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Hành động cắt chùm nho bằng kéo từ giàn nho bằng một chiếc kéo màu đen. Có thể thấy có một sợi dây màu xanh dương được buộc vào cuống của chùm nho này trước khi nó được cắt.</div>
+                    <div class="meta-info">File: query-p1-10-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=H%C3%A0nh%20%C4%91%E1%BB%99ng%20c%E1%BA%AFt%20ch%C3%B9m%20nho%20b%E1%BA%B1ng%20k%C3%A9o%20t%E1%BB%AB%20gi%C3%A0n%20nho%20b%E1%BA%B1ng%20m%E1%BB%99t%20chi%E1%BA%BFc%20k%C3%A9o%20m%C3%A0u%20%C4%91en.%20C%C3%B3%20th%E1%BB%83%20th%E1%BA%A5y%20c%C3%B3%20m%E1%BB%99t%20s%E1%BB%A3i%20d%C3%A2y%20m%C3%A0u%20xanh%20d%C6%B0%C6%A1ng%20%C4%91%C6%B0%E1%BB%A3c%20bu%E1%BB%99c%20v%C3%A0o%20cu%E1%BB%91ng%20c%E1%BB%A7a%20ch%C3%B9m%20nho%20n%C3%A0y%20tr%C6%B0%E1%BB%9Bc%20khi%20n%C3%B3%20%C4%91%C6%B0%E1%BB%A3c%20c%E1%BA%AFt.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#11</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Cảnh quay chậm tại vị trí vạch đích của cuộc đua xe đạp. Góc máy sát mặt đường bắt trọn khoảnh khắc về đích theo thứ tự nhất, nhì, ba lần lượt là 1 tay đua áo vàng quần đen, 1 tay đua áo xanh dương quần đen và 1 tay đua áo xanh dương quần đỏ</div>
+                    <div class="meta-info">File: query-p1-11-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=C%E1%BA%A3nh%20quay%20ch%E1%BA%ADm%20t%E1%BA%A1i%20v%E1%BB%8B%20tr%C3%AD%20v%E1%BA%A1ch%20%C4%91%C3%ADch%20c%E1%BB%A7a%20cu%E1%BB%99c%20%C4%91ua%20xe%20%C4%91%E1%BA%A1p.%20G%C3%B3c%20m%C3%A1y%20s%C3%A1t%20m%E1%BA%B7t%20%C4%91%C6%B0%E1%BB%9Dng%20b%E1%BA%AFt%20tr%E1%BB%8Dn%20kho%E1%BA%A3nh%20kh%E1%BA%AFc%20v%E1%BB%81%20%C4%91%C3%ADch%20theo%20th%E1%BB%A9%20t%E1%BB%B1%20nh%E1%BA%A5t%2C%20nh%C3%AC%2C%20ba%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20l%C3%A0%201%20tay%20%C4%91ua%20%C3%A1o%20v%C3%A0ng%20qu%E1%BA%A7n%20%C4%91en%2C%201%20tay%20%C4%91ua%20%C3%A1o%20xanh%20d%C6%B0%C6%A1ng%20qu%E1%BA%A7n%20%C4%91en%20v%C3%A0%201%20tay%20%C4%91ua%20%C3%A1o%20xanh%20d%C6%B0%C6%A1ng%20qu%E1%BA%A7n%20%C4%91%E1%BB%8F&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#12</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Có thể thấy trong cảnh quay có 4 tài xế xe ôm công nghệ trong trạm xăng, trong đó 3 người đứng đợi còn 1 người lái xe từ trái sang phải khung hình. Trước đó là cảnh một người đậy nắp bình xăng xe máy của họ. Có thông tin về giá dầu mazut được hiển thị trong khung hình.</div>
+                    <div class="meta-info">File: query-p1-12-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=C%C3%B3%20th%E1%BB%83%20th%E1%BA%A5y%20trong%20c%E1%BA%A3nh%20quay%20c%C3%B3%204%20t%C3%A0i%20x%E1%BA%BF%20xe%20%C3%B4m%20c%C3%B4ng%20ngh%E1%BB%87%20trong%20tr%E1%BA%A1m%20x%C4%83ng%2C%20trong%20%C4%91%C3%B3%203%20ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BB%A9ng%20%C4%91%E1%BB%A3i%20c%C3%B2n%201%20ng%C6%B0%E1%BB%9Di%20l%C3%A1i%20xe%20t%E1%BB%AB%20tr%C3%A1i%20sang%20ph%E1%BA%A3i%20khung%20h%C3%ACnh.%20Tr%C6%B0%E1%BB%9Bc%20%C4%91%C3%B3%20l%C3%A0%20c%E1%BA%A3nh%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BA%ADy%20n%E1%BA%AFp%20b%C3%ACnh%20x%C4%83ng%20xe%20m%C3%A1y%20c%E1%BB%A7a%20h%E1%BB%8D.%20C%C3%B3%20th%C3%B4ng%20tin%20v%E1%BB%81%20gi%C3%A1%20d%E1%BA%A7u%20mazut%20%C4%91%C6%B0%E1%BB%A3c%20hi%E1%BB%83n%20th%E1%BB%8B%20trong%20khung%20h%C3%ACnh.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#13</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Một người đứng dưới nước và rọi đèn. Tiếp theo là cảnh người này kéo lưới cá lúc bình minh, sau đó được một nhóm người khác tiến đến dùng máy quay ghi hình.</div>
+                    <div class="meta-info">File: query-p1-13-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=M%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BB%A9ng%20d%C6%B0%E1%BB%9Bi%20n%C6%B0%E1%BB%9Bc%20v%C3%A0%20r%E1%BB%8Di%20%C4%91%C3%A8n.%20Ti%E1%BA%BFp%20theo%20l%C3%A0%20c%E1%BA%A3nh%20ng%C6%B0%E1%BB%9Di%20n%C3%A0y%20k%C3%A9o%20l%C6%B0%E1%BB%9Bi%20c%C3%A1%20l%C3%BAc%20b%C3%ACnh%20minh%2C%20sau%20%C4%91%C3%B3%20%C4%91%C6%B0%E1%BB%A3c%20m%E1%BB%99t%20nh%C3%B3m%20ng%C6%B0%E1%BB%9Di%20kh%C3%A1c%20ti%E1%BA%BFn%20%C4%91%E1%BA%BFn%20d%C3%B9ng%20m%C3%A1y%20quay%20ghi%20h%C3%ACnh.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#14</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Người đầu bếp lần lượt đặt các miếng nguyên liệu dạng thanh và những lát cắt hình hoa vào một đĩa đang được hấp trong nồi.
+Các nguyên liệu được dùng đũa sắp xếp xen kẽ xung quanh phần thức ăn đã có sẵn trên đĩa.
+Sau đó, đầu bếp dùng muỗng lấy thêm một loại nguyên liệu mềm từ tô thủy tinh.
+Phần nguyên liệu này được đặt vào giữa đĩa, xung quanh là các miếng dạng thanh và hình hoa đã được sắp xếp trước đó.</div>
+                    <div class="meta-info">File: query-p1-14-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20%C4%91%E1%BA%B7t%20c%C3%A1c%20mi%E1%BA%BFng%20nguy%C3%AAn%20li%E1%BB%87u%20d%E1%BA%A1ng%20thanh%20v%C3%A0%20nh%E1%BB%AFng%20l%C3%A1t%20c%E1%BA%AFt%20h%C3%ACnh%20hoa%20v%C3%A0o%20m%E1%BB%99t%20%C4%91%C4%A9a%20%C4%91ang%20%C4%91%C6%B0%E1%BB%A3c%20h%E1%BA%A5p%20trong%20n%E1%BB%93i.%0AC%C3%A1c%20nguy%C3%AAn%20li%E1%BB%87u%20%C4%91%C6%B0%E1%BB%A3c%20d%C3%B9ng%20%C4%91%C5%A9a%20s%E1%BA%AFp%20x%E1%BA%BFp%20xen%20k%E1%BA%BD%20xung%20quanh%20ph%E1%BA%A7n%20th%E1%BB%A9c%20%C4%83n%20%C4%91%C3%A3%20c%C3%B3%20s%E1%BA%B5n%20tr%C3%AAn%20%C4%91%C4%A9a.%0ASau%20%C4%91%C3%B3%2C%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20d%C3%B9ng%20mu%E1%BB%97ng%20l%E1%BA%A5y%20th%C3%AAm%20m%E1%BB%99t%20lo%E1%BA%A1i%20nguy%C3%AAn%20li%E1%BB%87u%20m%E1%BB%81m%20t%E1%BB%AB%20t%C3%B4%20th%E1%BB%A7y%20tinh.%0APh%E1%BA%A7n%20nguy%C3%AAn%20li%E1%BB%87u%20n%C3%A0y%20%C4%91%C6%B0%E1%BB%A3c%20%C4%91%E1%BA%B7t%20v%C3%A0o%20gi%E1%BB%AFa%20%C4%91%C4%A9a%2C%20xung%20quanh%20l%C3%A0%20c%C3%A1c%20mi%E1%BA%BFng%20d%E1%BA%A1ng%20thanh%20v%C3%A0%20h%C3%ACnh%20hoa%20%C4%91%C3%A3%20%C4%91%C6%B0%E1%BB%A3c%20s%E1%BA%AFp%20x%E1%BA%BFp%20tr%C6%B0%E1%BB%9Bc%20%C4%91%C3%B3.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#15</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Bản đồ phân bố động đất tại một vùng trên thế giới, với một bảng chú giải phía bên trái gồm các kí hiệu nhiều màu sắc tương ứng với các vị trí tâm chấn có cấp độ động đất khác nhau. Không tính bảng chú giải, có bao nhiêu vị trí ghi nhận động đất cấp độ 4?</div>
+                    <div class="meta-info">File: query-p1-15-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=B%E1%BA%A3n%20%C4%91%E1%BB%93%20ph%C3%A2n%20b%E1%BB%91%20%C4%91%E1%BB%99ng%20%C4%91%E1%BA%A5t%20t%E1%BA%A1i%20m%E1%BB%99t%20v%C3%B9ng%20tr%C3%AAn%20th%E1%BA%BF%20gi%E1%BB%9Bi%2C%20v%E1%BB%9Bi%20m%E1%BB%99t%20b%E1%BA%A3ng%20ch%C3%BA%20gi%E1%BA%A3i%20ph%C3%ADa%20b%C3%AAn%20tr%C3%A1i%20g%E1%BB%93m%20c%C3%A1c%20k%C3%AD%20hi%E1%BB%87u%20nhi%E1%BB%81u%20m%C3%A0u%20s%E1%BA%AFc%20t%C6%B0%C6%A1ng%20%E1%BB%A9ng%20v%E1%BB%9Bi%20c%C3%A1c%20v%E1%BB%8B%20tr%C3%AD%20t%C3%A2m%20ch%E1%BA%A5n%20c%C3%B3%20c%E1%BA%A5p%20%C4%91%E1%BB%99%20%C4%91%E1%BB%99ng%20%C4%91%E1%BA%A5t%20kh%C3%A1c%20nhau.%20Kh%C3%B4ng%20t%C3%ADnh%20b%E1%BA%A3ng%20ch%C3%BA%20gi%E1%BA%A3i%2C%20c%C3%B3%20bao%20nhi%C3%AAu%20v%E1%BB%8B%20tr%C3%AD%20ghi%20nh%E1%BA%ADn%20%C4%91%E1%BB%99ng%20%C4%91%E1%BA%A5t%20c%E1%BA%A5p%20%C4%91%E1%BB%99%204%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#16</div>
+                <div class="content">
+                    <span class="type-badge type-TRAKE">TRAKE</span>
+                    <div class="text">Đoạn video bắt đầu bằng ảnh cận đầu một con lân trắng, mũi đỏ, bên cạnh lá cờ trắng viền đỏ.
+E1 Khoảnh khắc đầu tiên xuất hiện đầy đủ hai con rồng vàng đang xoay vòng.
+E2 Khoảnh khắc đầu tiên con lân hoàn tất cú xoay người trên các thanh trụ (thời điểm đâu tiên các chân của lân đặt trên trụ sau khi xoay).
+E3 Khoảnh khắc đầu tiên dùi chạm vào kẻng đồng múa lân.</div>
+                    <div class="meta-info">File: query-p1-16-trake.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20video%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20b%E1%BA%B1ng%20%E1%BA%A3nh%20c%E1%BA%ADn%20%C4%91%E1%BA%A7u%20m%E1%BB%99t%20con%20l%C3%A2n%20tr%E1%BA%AFng%2C%20m%C5%A9i%20%C4%91%E1%BB%8F%2C%20b%C3%AAn%20c%E1%BA%A1nh%20l%C3%A1%20c%E1%BB%9D%20tr%E1%BA%AFng%20vi%E1%BB%81n%20%C4%91%E1%BB%8F.%0AE1%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20xu%E1%BA%A5t%20hi%E1%BB%87n%20%C4%91%E1%BA%A7y%20%C4%91%E1%BB%A7%20hai%20con%20r%E1%BB%93ng%20v%C3%A0ng%20%C4%91ang%20xoay%20v%C3%B2ng.%0AE2%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20con%20l%C3%A2n%20ho%C3%A0n%20t%E1%BA%A5t%20c%C3%BA%20xoay%20ng%C6%B0%E1%BB%9Di%20tr%C3%AAn%20c%C3%A1c%20thanh%20tr%E1%BB%A5%20%28th%E1%BB%9Di%20%C4%91i%E1%BB%83m%20%C4%91%C3%A2u%20ti%C3%AAn%20c%C3%A1c%20ch%C3%A2n%20c%E1%BB%A7a%20l%C3%A2n%20%C4%91%E1%BA%B7t%20tr%C3%AAn%20tr%E1%BB%A5%20sau%20khi%20xoay%29.%0AE3%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20d%C3%B9i%20ch%E1%BA%A1m%20v%C3%A0o%20k%E1%BA%BBng%20%C4%91%E1%BB%93ng%20m%C3%BAa%20l%C3%A2n.&type=TRAKE" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#17</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn video trong buổi trao quà từ thiện diễn ra tại 1 bệnh viện trong dịp Xuân 2024. Trong cảnh có hai người đàn ông (mặc áo sơ mi hồng và sơ mi trắng) đứng hai bên, đại diện ban tổ chức. Ở giữa là bốn em nhỏ và thiếu niên, trong đó có em mặc áo đỏ, em mặc áo trắng, em mặc váy hồng và em mặc áo xanh. Các em được trao bảng tượng trưng với nội dung “Chương trình: Trao kinh phí hỗ trợ cho trẻ em mồ côi do dịch COVID-19”. Trước mặt mỗi em là túi quà lớn mang logo y tế. Phía sau là phông nền màu đỏ với khẩu hiệu đón xuân và thông tin sự kiện.</div>
+                    <div class="meta-info">File: query-p1-17-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20video%20trong%20bu%E1%BB%95i%20trao%20qu%C3%A0%20t%E1%BB%AB%20thi%E1%BB%87n%20di%E1%BB%85n%20ra%20t%E1%BA%A1i%201%20b%E1%BB%87nh%20vi%E1%BB%87n%20trong%20d%E1%BB%8Bp%20Xu%C3%A2n%202024.%20Trong%20c%E1%BA%A3nh%20c%C3%B3%20hai%20ng%C6%B0%E1%BB%9Di%20%C4%91%C3%A0n%20%C3%B4ng%20%28m%E1%BA%B7c%20%C3%A1o%20s%C6%A1%20mi%20h%E1%BB%93ng%20v%C3%A0%20s%C6%A1%20mi%20tr%E1%BA%AFng%29%20%C4%91%E1%BB%A9ng%20hai%20b%C3%AAn%2C%20%C4%91%E1%BA%A1i%20di%E1%BB%87n%20ban%20t%E1%BB%95%20ch%E1%BB%A9c.%20%E1%BB%9E%20gi%E1%BB%AFa%20l%C3%A0%20b%E1%BB%91n%20em%20nh%E1%BB%8F%20v%C3%A0%20thi%E1%BA%BFu%20ni%C3%AAn%2C%20trong%20%C4%91%C3%B3%20c%C3%B3%20em%20m%E1%BA%B7c%20%C3%A1o%20%C4%91%E1%BB%8F%2C%20em%20m%E1%BA%B7c%20%C3%A1o%20tr%E1%BA%AFng%2C%20em%20m%E1%BA%B7c%20v%C3%A1y%20h%E1%BB%93ng%20v%C3%A0%20em%20m%E1%BA%B7c%20%C3%A1o%20xanh.%20C%C3%A1c%20em%20%C4%91%C6%B0%E1%BB%A3c%20trao%20b%E1%BA%A3ng%20t%C6%B0%E1%BB%A3ng%20tr%C6%B0ng%20v%E1%BB%9Bi%20n%E1%BB%99i%20dung%20%E2%80%9CCh%C6%B0%C6%A1ng%20tr%C3%ACnh%3A%20Trao%20kinh%20ph%C3%AD%20h%E1%BB%97%20tr%E1%BB%A3%20cho%20tr%E1%BA%BB%20em%20m%E1%BB%93%20c%C3%B4i%20do%20d%E1%BB%8Bch%20COVID-19%E2%80%9D.%20Tr%C6%B0%E1%BB%9Bc%20m%E1%BA%B7t%20m%E1%BB%97i%20em%20l%C3%A0%20t%C3%BAi%20qu%C3%A0%20l%E1%BB%9Bn%20mang%20logo%20y%20t%E1%BA%BF.%20Ph%C3%ADa%20sau%20l%C3%A0%20ph%C3%B4ng%20n%E1%BB%81n%20m%C3%A0u%20%C4%91%E1%BB%8F%20v%E1%BB%9Bi%20kh%E1%BA%A9u%20hi%E1%BB%87u%20%C4%91%C3%B3n%20xu%C3%A2n%20v%C3%A0%20th%C3%B4ng%20tin%20s%E1%BB%B1%20ki%E1%BB%87n.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#17</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Đoạn clip mô tả hậu quả của hiện tượng sạt lở đất nghiêm trọng, đất đá tràn xuống gây tắc nghẽn hoàn toàn một đoạn đường đèo. Trong một cảnh quay cận, có thể thấy một cột mốc đường bộ với phần đỉnh màu đỏ chỉ còn lộ ra phần trên, phần lớn đã bị đất đá vùi lấp. Ở cảnh quay cuối, một người đi xe máy đang vật lộn để điều khiển phương tiện vượt qua khu vực bùn lầy, trên chiếc xe máy có treo một vật màu xanh lá. Tên của con đèo là gì?</div>
+                    <div class="meta-info">File: query-p1-17-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20clip%20m%C3%B4%20t%E1%BA%A3%20h%E1%BA%ADu%20qu%E1%BA%A3%20c%E1%BB%A7a%20hi%E1%BB%87n%20t%C6%B0%E1%BB%A3ng%20s%E1%BA%A1t%20l%E1%BB%9F%20%C4%91%E1%BA%A5t%20nghi%C3%AAm%20tr%E1%BB%8Dng%2C%20%C4%91%E1%BA%A5t%20%C4%91%C3%A1%20tr%C3%A0n%20xu%E1%BB%91ng%20g%C3%A2y%20t%E1%BA%AFc%20ngh%E1%BA%BDn%20ho%C3%A0n%20to%C3%A0n%20m%E1%BB%99t%20%C4%91o%E1%BA%A1n%20%C4%91%C6%B0%E1%BB%9Dng%20%C4%91%C3%A8o.%20Trong%20m%E1%BB%99t%20c%E1%BA%A3nh%20quay%20c%E1%BA%ADn%2C%20c%C3%B3%20th%E1%BB%83%20th%E1%BA%A5y%20m%E1%BB%99t%20c%E1%BB%99t%20m%E1%BB%91c%20%C4%91%C6%B0%E1%BB%9Dng%20b%E1%BB%99%20v%E1%BB%9Bi%20ph%E1%BA%A7n%20%C4%91%E1%BB%89nh%20m%C3%A0u%20%C4%91%E1%BB%8F%20ch%E1%BB%89%20c%C3%B2n%20l%E1%BB%99%20ra%20ph%E1%BA%A7n%20tr%C3%AAn%2C%20ph%E1%BA%A7n%20l%E1%BB%9Bn%20%C4%91%C3%A3%20b%E1%BB%8B%20%C4%91%E1%BA%A5t%20%C4%91%C3%A1%20v%C3%B9i%20l%E1%BA%A5p.%20%E1%BB%9E%20c%E1%BA%A3nh%20quay%20cu%E1%BB%91i%2C%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91i%20xe%20m%C3%A1y%20%C4%91ang%20v%E1%BA%ADt%20l%E1%BB%99n%20%C4%91%E1%BB%83%20%C4%91i%E1%BB%81u%20khi%E1%BB%83n%20ph%C6%B0%C6%A1ng%20ti%E1%BB%87n%20v%C6%B0%E1%BB%A3t%20qua%20khu%20v%E1%BB%B1c%20b%C3%B9n%20l%E1%BA%A7y%2C%20tr%C3%AAn%20chi%E1%BA%BFc%20xe%20m%C3%A1y%20c%C3%B3%20treo%20m%E1%BB%99t%20v%E1%BA%ADt%20m%C3%A0u%20xanh%20l%C3%A1.%20T%C3%AAn%20c%E1%BB%A7a%20con%20%C4%91%C3%A8o%20l%C3%A0%20g%C3%AC%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#18</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Cảnh quay cho thấy hành động trình bày món ăn sau khi hoàn thành giai đoạn chế biến. Bún được cho đầu tiên vào một chén rỗng, sau đó đầu bếp lần lượt cho từng vá nước dùng cùng các nguyên liệu như thịt gà, cà rốt, sả, nấm mèo vào chén bún, và kết thúc bằng việc thả một cọng ngò lên trên cùng. Cảnh quay tiếp theo là cảnh zoom xa dần chén bún, ta thấy bên cạnh chén bún còn có 1 chén nước chấm nhỏ với 2 miếng ớt.</div>
+                    <div class="meta-info">File: query-p1-18-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=C%E1%BA%A3nh%20quay%20cho%20th%E1%BA%A5y%20h%C3%A0nh%20%C4%91%E1%BB%99ng%20tr%C3%ACnh%20b%C3%A0y%20m%C3%B3n%20%C4%83n%20sau%20khi%20ho%C3%A0n%20th%C3%A0nh%20giai%20%C4%91o%E1%BA%A1n%20ch%E1%BA%BF%20bi%E1%BA%BFn.%20B%C3%BAn%20%C4%91%C6%B0%E1%BB%A3c%20cho%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20v%C3%A0o%20m%E1%BB%99t%20ch%C3%A9n%20r%E1%BB%97ng%2C%20sau%20%C4%91%C3%B3%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20l%E1%BA%A7n%20l%C6%B0%E1%BB%A3t%20cho%20t%E1%BB%ABng%20v%C3%A1%20n%C6%B0%E1%BB%9Bc%20d%C3%B9ng%20c%C3%B9ng%20c%C3%A1c%20nguy%C3%AAn%20li%E1%BB%87u%20nh%C6%B0%20th%E1%BB%8Bt%20g%C3%A0%2C%20c%C3%A0%20r%E1%BB%91t%2C%20s%E1%BA%A3%2C%20n%E1%BA%A5m%20m%C3%A8o%20v%C3%A0o%20ch%C3%A9n%20b%C3%BAn%2C%20v%C3%A0%20k%E1%BA%BFt%20th%C3%BAc%20b%E1%BA%B1ng%20vi%E1%BB%87c%20th%E1%BA%A3%20m%E1%BB%99t%20c%E1%BB%8Dng%20ng%C3%B2%20l%C3%AAn%20tr%C3%AAn%20c%C3%B9ng.%20C%E1%BA%A3nh%20quay%20ti%E1%BA%BFp%20theo%20l%C3%A0%20c%E1%BA%A3nh%20zoom%20xa%20d%E1%BA%A7n%20ch%C3%A9n%20b%C3%BAn%2C%20ta%20th%E1%BA%A5y%20b%C3%AAn%20c%E1%BA%A1nh%20ch%C3%A9n%20b%C3%BAn%20c%C3%B2n%20c%C3%B3%201%20ch%C3%A9n%20n%C6%B0%E1%BB%9Bc%20ch%E1%BA%A5m%20nh%E1%BB%8F%20v%E1%BB%9Bi%202%20mi%E1%BA%BFng%20%E1%BB%9Bt.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#18</div>
+                <div class="content">
+                    <span class="type-badge type-TRAKE">TRAKE</span>
+                    <div class="text">Trong đoạn video nấu ăn một món ăn về nấm, gồm các khoảnh khắc sơ chế:
+E1: Khoảnh khắc đầu tiên thấy cắt nấm.
+E2: Khoảnh khắc đầu tiên cắt củ năng.
+E2: Khoảnh khắc đầu tiên cắt đậu hủ.
+E4: Khoảnh khắc chảo đặt lên bếp, đầu bếp mở lửa và thấy lửa bắt đầu xuất hiện</div>
+                    <div class="meta-info">File: query-p1-18-trake.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Trong%20%C4%91o%E1%BA%A1n%20video%20n%E1%BA%A5u%20%C4%83n%20m%E1%BB%99t%20m%C3%B3n%20%C4%83n%20v%E1%BB%81%20n%E1%BA%A5m%2C%20g%E1%BB%93m%20c%C3%A1c%20kho%E1%BA%A3nh%20kh%E1%BA%AFc%20s%C6%A1%20ch%E1%BA%BF%3A%0AE1%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20th%E1%BA%A5y%20c%E1%BA%AFt%20n%E1%BA%A5m.%0AE2%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20c%E1%BA%AFt%20c%E1%BB%A7%20n%C4%83ng.%0AE2%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20%C4%91%E1%BA%A7u%20ti%C3%AAn%20c%E1%BA%AFt%20%C4%91%E1%BA%ADu%20h%E1%BB%A7.%0AE4%3A%20Kho%E1%BA%A3nh%20kh%E1%BA%AFc%20ch%E1%BA%A3o%20%C4%91%E1%BA%B7t%20l%C3%AAn%20b%E1%BA%BFp%2C%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20m%E1%BB%9F%20l%E1%BB%ADa%20v%C3%A0%20th%E1%BA%A5y%20l%E1%BB%ADa%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20xu%E1%BA%A5t%20hi%E1%BB%87n&type=TRAKE" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#19</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Con lân do hai người điều khiển đang đứng thẳng và xoay vòng trên đỉnh cột. Sau vài giây nghỉ, con lân bất ngờ nhảy qua hai chiếc cột kế bên, chúi đầu xuống ngoạm lấy quả bí đỏ kèm bông hoa màu vàng. Cảnh quay kết thúc khi con lân tiếp tục nhảy sang các cột tiếp theo.</div>
+                    <div class="meta-info">File: query-p1-19-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Con%20l%C3%A2n%20do%20hai%20ng%C6%B0%E1%BB%9Di%20%C4%91i%E1%BB%81u%20khi%E1%BB%83n%20%C4%91ang%20%C4%91%E1%BB%A9ng%20th%E1%BA%B3ng%20v%C3%A0%20xoay%20v%C3%B2ng%20tr%C3%AAn%20%C4%91%E1%BB%89nh%20c%E1%BB%99t.%20Sau%20v%C3%A0i%20gi%C3%A2y%20ngh%E1%BB%89%2C%20con%20l%C3%A2n%20b%E1%BA%A5t%20ng%E1%BB%9D%20nh%E1%BA%A3y%20qua%20hai%20chi%E1%BA%BFc%20c%E1%BB%99t%20k%E1%BA%BF%20b%C3%AAn%2C%20ch%C3%BAi%20%C4%91%E1%BA%A7u%20xu%E1%BB%91ng%20ngo%E1%BA%A1m%20l%E1%BA%A5y%20qu%E1%BA%A3%20b%C3%AD%20%C4%91%E1%BB%8F%20k%C3%A8m%20b%C3%B4ng%20hoa%20m%C3%A0u%20v%C3%A0ng.%20C%E1%BA%A3nh%20quay%20k%E1%BA%BFt%20th%C3%BAc%20khi%20con%20l%C3%A2n%20ti%E1%BA%BFp%20t%E1%BB%A5c%20nh%E1%BA%A3y%20sang%20c%C3%A1c%20c%E1%BB%99t%20ti%E1%BA%BFp%20theo.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#19</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Trong đoạn video có 2 câu thơ của một nhà thơ ca ngợi anh hùng Nguyễn Trung Trực trong đình thần Nguyễn Trung Trực tại Kiên Giang. Hai câu thơ đó là gì?</div>
+                    <div class="meta-info">File: query-p1-19-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Trong%20%C4%91o%E1%BA%A1n%20video%20c%C3%B3%202%20c%C3%A2u%20th%C6%A1%20c%E1%BB%A7a%20m%E1%BB%99t%20nh%C3%A0%20th%C6%A1%20ca%20ng%E1%BB%A3i%20anh%20h%C3%B9ng%20Nguy%E1%BB%85n%20Trung%20Tr%E1%BB%B1c%20trong%20%C4%91%C3%ACnh%20th%E1%BA%A7n%20Nguy%E1%BB%85n%20Trung%20Tr%E1%BB%B1c%20t%E1%BA%A1i%20Ki%C3%AAn%20Giang.%20Hai%20c%C3%A2u%20th%C6%A1%20%C4%91%C3%B3%20l%C3%A0%20g%C3%AC%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#20</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Ba người đang đi bộ xuống một con dốc trong cơn mưa, có 2 người cầm dù, trong đó người cầm dù đi sau lại mặc một chiếc áo mưa có in hình con gấu ở sau lưng. Sau đó ta thấy nhiều người đang cùng nhau bước về hướng một căn nhà thông qua một con đường đất, bên cạnh là một cái ao.</div>
+                    <div class="meta-info">File: query-p1-20-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Ba%20ng%C6%B0%E1%BB%9Di%20%C4%91ang%20%C4%91i%20b%E1%BB%99%20xu%E1%BB%91ng%20m%E1%BB%99t%20con%20d%E1%BB%91c%20trong%20c%C6%A1n%20m%C6%B0a%2C%20c%C3%B3%202%20ng%C6%B0%E1%BB%9Di%20c%E1%BA%A7m%20d%C3%B9%2C%20trong%20%C4%91%C3%B3%20ng%C6%B0%E1%BB%9Di%20c%E1%BA%A7m%20d%C3%B9%20%C4%91i%20sau%20l%E1%BA%A1i%20m%E1%BA%B7c%20m%E1%BB%99t%20chi%E1%BA%BFc%20%C3%A1o%20m%C6%B0a%20c%C3%B3%20in%20h%C3%ACnh%20con%20g%E1%BA%A5u%20%E1%BB%9F%20sau%20l%C6%B0ng.%20Sau%20%C4%91%C3%B3%20ta%20th%E1%BA%A5y%20nhi%E1%BB%81u%20ng%C6%B0%E1%BB%9Di%20%C4%91ang%20c%C3%B9ng%20nhau%20b%C6%B0%E1%BB%9Bc%20v%E1%BB%81%20h%C6%B0%E1%BB%9Bng%20m%E1%BB%99t%20c%C4%83n%20nh%C3%A0%20th%C3%B4ng%20qua%20m%E1%BB%99t%20con%20%C4%91%C6%B0%E1%BB%9Dng%20%C4%91%E1%BA%A5t%2C%20b%C3%AAn%20c%E1%BA%A1nh%20l%C3%A0%20m%E1%BB%99t%20c%C3%A1i%20ao.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#21</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Cảnh quay bắt đầu bằng cảnh những con tôm đã được lột vỏ và nấu chín đang nằm trên dĩa, phía sau là người đầu bếp đang đặt 3 ổ bánh mì lên bàn. Sau đó là cảnh quay các đầu bếp, có người thì trang trí món ăn, có người thì chế biến món ăn. Những con tôm được cắt làm đôi và được nướng trên bếp.</div>
+                    <div class="meta-info">File: query-p1-21-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=C%E1%BA%A3nh%20quay%20b%E1%BA%AFt%20%C4%91%E1%BA%A7u%20b%E1%BA%B1ng%20c%E1%BA%A3nh%20nh%E1%BB%AFng%20con%20t%C3%B4m%20%C4%91%C3%A3%20%C4%91%C6%B0%E1%BB%A3c%20l%E1%BB%99t%20v%E1%BB%8F%20v%C3%A0%20n%E1%BA%A5u%20ch%C3%ADn%20%C4%91ang%20n%E1%BA%B1m%20tr%C3%AAn%20d%C4%A9a%2C%20ph%C3%ADa%20sau%20l%C3%A0%20ng%C6%B0%E1%BB%9Di%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%20%C4%91ang%20%C4%91%E1%BA%B7t%203%20%E1%BB%95%20b%C3%A1nh%20m%C3%AC%20l%C3%AAn%20b%C3%A0n.%20Sau%20%C4%91%C3%B3%20l%C3%A0%20c%E1%BA%A3nh%20quay%20c%C3%A1c%20%C4%91%E1%BA%A7u%20b%E1%BA%BFp%2C%20c%C3%B3%20ng%C6%B0%E1%BB%9Di%20th%C3%AC%20trang%20tr%C3%AD%20m%C3%B3n%20%C4%83n%2C%20c%C3%B3%20ng%C6%B0%E1%BB%9Di%20th%C3%AC%20ch%E1%BA%BF%20bi%E1%BA%BFn%20m%C3%B3n%20%C4%83n.%20Nh%E1%BB%AFng%20con%20t%C3%B4m%20%C4%91%C6%B0%E1%BB%A3c%20c%E1%BA%AFt%20l%C3%A0m%20%C4%91%C3%B4i%20v%C3%A0%20%C4%91%C6%B0%E1%BB%A3c%20n%C6%B0%E1%BB%9Bng%20tr%C3%AAn%20b%E1%BA%BFp.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#22</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Người phụ nữ mặc áo dài màu hồng, đeo kính đang giảng giải về các trường hợp sử dụng khác nhau của động từ 'remember' dựa trên mốc thời gian của hành động được nhắc tới.</div>
+                    <div class="meta-info">File: query-p1-22-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Ng%C6%B0%E1%BB%9Di%20ph%E1%BB%A5%20n%E1%BB%AF%20m%E1%BA%B7c%20%C3%A1o%20d%C3%A0i%20m%C3%A0u%20h%E1%BB%93ng%2C%20%C4%91eo%20k%C3%ADnh%20%C4%91ang%20gi%E1%BA%A3ng%20gi%E1%BA%A3i%20v%E1%BB%81%20c%C3%A1c%20tr%C6%B0%E1%BB%9Dng%20h%E1%BB%A3p%20s%E1%BB%AD%20d%E1%BB%A5ng%20kh%C3%A1c%20nhau%20c%E1%BB%A7a%20%C4%91%E1%BB%99ng%20t%E1%BB%AB%20%27remember%27%20d%E1%BB%B1a%20tr%C3%AAn%20m%E1%BB%91c%20th%E1%BB%9Di%20gian%20c%E1%BB%A7a%20h%C3%A0nh%20%C4%91%E1%BB%99ng%20%C4%91%C6%B0%E1%BB%A3c%20nh%E1%BA%AFc%20t%E1%BB%9Bi.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#22</div>
+                <div class="content">
+                    <span class="type-badge type-QA">QA</span>
+                    <div class="text">Đoạn video về một người phụ nữ dạy nấu ăn cho những người khác. Trong đoạn video có thể thấy một người đang cầm công thức món ăn với nguyên liệu chính là 200g thịt nạc xay. Hỏi tiêu đề của công thức nấu ăn (tên món ăn) này là gì?</div>
+                    <div class="meta-info">File: query-p1-22-qa.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20video%20v%E1%BB%81%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20ph%E1%BB%A5%20n%E1%BB%AF%20d%E1%BA%A1y%20n%E1%BA%A5u%20%C4%83n%20cho%20nh%E1%BB%AFng%20ng%C6%B0%E1%BB%9Di%20kh%C3%A1c.%20Trong%20%C4%91o%E1%BA%A1n%20video%20c%C3%B3%20th%E1%BB%83%20th%E1%BA%A5y%20m%E1%BB%99t%20ng%C6%B0%E1%BB%9Di%20%C4%91ang%20c%E1%BA%A7m%20c%C3%B4ng%20th%E1%BB%A9c%20m%C3%B3n%20%C4%83n%20v%E1%BB%9Bi%20nguy%C3%AAn%20li%E1%BB%87u%20ch%C3%ADnh%20l%C3%A0%20200g%20th%E1%BB%8Bt%20n%E1%BA%A1c%20xay.%20H%E1%BB%8Fi%20ti%C3%AAu%20%C4%91%E1%BB%81%20c%E1%BB%A7a%20c%C3%B4ng%20th%E1%BB%A9c%20n%E1%BA%A5u%20%C4%83n%20%28t%C3%AAn%20m%C3%B3n%20%C4%83n%29%20n%C3%A0y%20l%C3%A0%20g%C3%AC%3F&type=QA" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#23</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Hình ảnh giáo viên nam mặc sơ mi trắng, thắt cà vạt tối màu, nổi bật trên phông nền xanh dương đậm có hoa văn mờ.
+
+Slide bài giảng Nền trắng với khung viền màu hồng tím, phía trên có thanh tiêu đề xanh dương chứa họa tiết địa cầu và mũi tên vàng/xanh ngọc. Bên dưới là sơ đồ 3 tầng được liên kết bởi các mũi tên xanh ngọc trỏ xuống:
+
+Tầng 1: 2 khối hộp được bao bởi 1 khối hộp cam.
+
+Tầng 2: 1 khối hộp lớn màu xanh dương đậm ở chính giữa.
+
+Tầng 3: 2 khối hộp được bao bởi 1 khối hộp xanh lá cây.</div>
+                    <div class="meta-info">File: query-p1-23-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=H%C3%ACnh%20%E1%BA%A3nh%20gi%C3%A1o%20vi%C3%AAn%20nam%20m%E1%BA%B7c%20s%C6%A1%20mi%20tr%E1%BA%AFng%2C%20th%E1%BA%AFt%20c%C3%A0%20v%E1%BA%A1t%20t%E1%BB%91i%20m%C3%A0u%2C%20n%E1%BB%95i%20b%E1%BA%ADt%20tr%C3%AAn%20ph%C3%B4ng%20n%E1%BB%81n%20xanh%20d%C6%B0%C6%A1ng%20%C4%91%E1%BA%ADm%20c%C3%B3%20hoa%20v%C4%83n%20m%E1%BB%9D.%0A%0ASlide%20b%C3%A0i%20gi%E1%BA%A3ng%20N%E1%BB%81n%20tr%E1%BA%AFng%20v%E1%BB%9Bi%20khung%20vi%E1%BB%81n%20m%C3%A0u%20h%E1%BB%93ng%20t%C3%ADm%2C%20ph%C3%ADa%20tr%C3%AAn%20c%C3%B3%20thanh%20ti%C3%AAu%20%C4%91%E1%BB%81%20xanh%20d%C6%B0%C6%A1ng%20ch%E1%BB%A9a%20h%E1%BB%8Da%20ti%E1%BA%BFt%20%C4%91%E1%BB%8Ba%20c%E1%BA%A7u%20v%C3%A0%20m%C5%A9i%20t%C3%AAn%20v%C3%A0ng/xanh%20ng%E1%BB%8Dc.%20B%C3%AAn%20d%C6%B0%E1%BB%9Bi%20l%C3%A0%20s%C6%A1%20%C4%91%E1%BB%93%203%20t%E1%BA%A7ng%20%C4%91%C6%B0%E1%BB%A3c%20li%C3%AAn%20k%E1%BA%BFt%20b%E1%BB%9Fi%20c%C3%A1c%20m%C5%A9i%20t%C3%AAn%20xanh%20ng%E1%BB%8Dc%20tr%E1%BB%8F%20xu%E1%BB%91ng%3A%0A%0AT%E1%BA%A7ng%201%3A%202%20kh%E1%BB%91i%20h%E1%BB%99p%20%C4%91%C6%B0%E1%BB%A3c%20bao%20b%E1%BB%9Fi%201%20kh%E1%BB%91i%20h%E1%BB%99p%20cam.%0A%0AT%E1%BA%A7ng%202%3A%201%20kh%E1%BB%91i%20h%E1%BB%99p%20l%E1%BB%9Bn%20m%C3%A0u%20xanh%20d%C6%B0%C6%A1ng%20%C4%91%E1%BA%ADm%20%E1%BB%9F%20ch%C3%ADnh%20gi%E1%BB%AFa.%0A%0AT%E1%BA%A7ng%203%3A%202%20kh%E1%BB%91i%20h%E1%BB%99p%20%C4%91%C6%B0%E1%BB%A3c%20bao%20b%E1%BB%9Fi%201%20kh%E1%BB%91i%20h%E1%BB%99p%20xanh%20l%C3%A1%20c%C3%A2y.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#24</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Đoạn clip được cắt từ một phóng sự về một nhóm các nghệ nhân làm nghề đan lát các sản phẩm thủ công từ cây lục bình. Đầu tiên là một cảnh lia cam duy nhất từ trái sang phải, theo thứ tự ta thấy 4 sản phẩm: túi xách, chậu hoa, bộ ấm tách trà và túi xách. Ngay sau cảnh này, người phụ nữ bên trái lấy một tách trà trong bộ ấm tách và nâng niu trong khi nghe người phụ nữ bên phải trò chuyện.</div>
+                    <div class="meta-info">File: query-p1-24-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=%C4%90o%E1%BA%A1n%20clip%20%C4%91%C6%B0%E1%BB%A3c%20c%E1%BA%AFt%20t%E1%BB%AB%20m%E1%BB%99t%20ph%C3%B3ng%20s%E1%BB%B1%20v%E1%BB%81%20m%E1%BB%99t%20nh%C3%B3m%20c%C3%A1c%20ngh%E1%BB%87%20nh%C3%A2n%20l%C3%A0m%20ngh%E1%BB%81%20%C4%91an%20l%C3%A1t%20c%C3%A1c%20s%E1%BA%A3n%20ph%E1%BA%A9m%20th%E1%BB%A7%20c%C3%B4ng%20t%E1%BB%AB%20c%C3%A2y%20l%E1%BB%A5c%20b%C3%ACnh.%20%C4%90%E1%BA%A7u%20ti%C3%AAn%20l%C3%A0%20m%E1%BB%99t%20c%E1%BA%A3nh%20lia%20cam%20duy%20nh%E1%BA%A5t%20t%E1%BB%AB%20tr%C3%A1i%20sang%20ph%E1%BA%A3i%2C%20theo%20th%E1%BB%A9%20t%E1%BB%B1%20ta%20th%E1%BA%A5y%204%20s%E1%BA%A3n%20ph%E1%BA%A9m%3A%20t%C3%BAi%20x%C3%A1ch%2C%20ch%E1%BA%ADu%20hoa%2C%20b%E1%BB%99%20%E1%BA%A5m%20t%C3%A1ch%20tr%C3%A0%20v%C3%A0%20t%C3%BAi%20x%C3%A1ch.%20Ngay%20sau%20c%E1%BA%A3nh%20n%C3%A0y%2C%20ng%C6%B0%E1%BB%9Di%20ph%E1%BB%A5%20n%E1%BB%AF%20b%C3%AAn%20tr%C3%A1i%20l%E1%BA%A5y%20m%E1%BB%99t%20t%C3%A1ch%20tr%C3%A0%20trong%20b%E1%BB%99%20%E1%BA%A5m%20t%C3%A1ch%20v%C3%A0%20n%C3%A2ng%20niu%20trong%20khi%20nghe%20ng%C6%B0%E1%BB%9Di%20ph%E1%BB%A5%20n%E1%BB%AF%20b%C3%AAn%20ph%E1%BA%A3i%20tr%C3%B2%20chuy%E1%BB%87n.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="q-badge">#25</div>
+                <div class="content">
+                    <span class="type-badge type-KIS">KIS</span>
+                    <div class="text">Hai bạn học sinh mặc đồng phục áo trắng, quần xanh, quàng khăn đỏ đang làm MC trên một sân khấu tại trường học, phía sau là một bộ trống cơ màu đỏ và một cây đàn piano.</div>
+                    <div class="meta-info">File: query-p1-25-kis.txt</div>
+                </div>
+                <div class="action-area">
+                    <a href="index.html?query=Hai%20b%E1%BA%A1n%20h%E1%BB%8Dc%20sinh%20m%E1%BA%B7c%20%C4%91%E1%BB%93ng%20ph%E1%BB%A5c%20%C3%A1o%20tr%E1%BA%AFng%2C%20qu%E1%BA%A7n%20xanh%2C%20qu%C3%A0ng%20kh%C4%83n%20%C4%91%E1%BB%8F%20%C4%91ang%20l%C3%A0m%20MC%20tr%C3%AAn%20m%E1%BB%99t%20s%C3%A2n%20kh%E1%BA%A5u%20t%E1%BA%A1i%20tr%C6%B0%E1%BB%9Dng%20h%E1%BB%8Dc%2C%20ph%C3%ADa%20sau%20l%C3%A0%20m%E1%BB%99t%20b%E1%BB%99%20tr%E1%BB%91ng%20c%C6%A1%20m%C3%A0u%20%C4%91%E1%BB%8F%20v%C3%A0%20m%E1%BB%99t%20c%C3%A2y%20%C4%91%C3%A0n%20piano.&type=KIS" target="_blank" class="btn">🔍 Tìm Kiếm</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

@@ -250,4 +250,18 @@ datasets/
 __pycache__/
 *.pyc
 .pytest_cache/
-docs/decisions_local_backup.md 
+
+
+submission/*
+
+dữ liệu cũ/*
+
+notbook/*
+
+data/*
+
+script/*
+
+outputs/*
+
+docs/*

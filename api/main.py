@@ -13,34 +13,31 @@ import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # ── Resolve project root (EBT_Project_2026/) ──
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # ── Lazy-init heavy resources on startup ──
-_searcher = None
+_global_state = {}
 
-def _get_searcher():
-    """Singleton getter — imports VectorSearcher only once."""
-    global _searcher
-    if _searcher is None:
-        try:
-            from src.role_a_retrieval.searcher import VectorSearcher
-            _searcher = VectorSearcher()
-        except Exception as e:
-            print(f"[WARN] VectorSearcher unavailable: {e}")
-            _searcher = None
-    return _searcher
+def get_db():
+    return _global_state.get("db")
 
+def get_faiss():
+    return _global_state.get("faiss")
+
+def get_detection_store():
+    return _global_state.get("detection_store")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Pre-load searcher on startup so first request is fast."""
+    """Pre-load components on startup so first request is fast."""
     print("[API] Starting EBT Vision Search API...")
     print(f"[API] Project root: {PROJECT_ROOT}")
 
@@ -50,18 +47,24 @@ async def lifespan(app: FastAPI):
     else:
         print(f"[WARN] Keyframes directory NOT found: {keyframes_dir}")
 
-    # Try to pre-load searcher (non-blocking if fails)
+    # Load heavy resources once
     try:
-        _get_searcher()
-        if _searcher:
-            print("[API] VectorSearcher loaded successfully.")
-        else:
-            print("[API] VectorSearcher not available — running in DEMO mode.")
+        from src.database.db_manager import DatabaseManager
+        from src.retrieval.vector_index import FAISSIndex
+        from src.database.legacy_detection_store import LegacyDetectionStore
+        
+        _global_state["db"] = DatabaseManager()
+        print("[API] DatabaseManager loaded.")
+        _global_state["faiss"] = FAISSIndex()
+        print("[API] FAISSIndex pre-loaded successfully.")
+        _global_state["detection_store"] = LegacyDetectionStore()
+        print("[API] LegacyDetectionStore loaded.")
     except Exception as e:
-        print(f"[API] VectorSearcher load error (DEMO mode): {e}")
+        print(f"[API] Component load error: {e}")
 
     yield
     print("[API] Shutting down...")
+    _global_state.clear()
 
 
 # ── FastAPI App ──
@@ -71,9 +74,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request
 
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -95,40 +95,31 @@ app.add_middleware(
 )
 
 # ── Mount Static Files ──
-# Frontend UI
 static_dir = Path(__file__).resolve().parent / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-# Keyframe images — served at /keyframes/{video_id}/{frame_idx}.jpg
 keyframes_dir = PROJECT_ROOT / "data" / "raw" / "keyframes"
 if keyframes_dir.exists():
     app.mount("/keyframes", StaticFiles(directory=str(keyframes_dir)), name="keyframes")
 
 from api.routes.kis_routes import router as kis_router
-from api.routes.qa_routes import router as qa_router
 from api.routes.trake_routes import router as trake_router
 from api.routes.feedback_routes import router as feedback_router
 
 app.include_router(kis_router, prefix="/api/v1")
-app.include_router(qa_router, prefix="/api/v1")
 app.include_router(trake_router, prefix="/api/v1")
 app.include_router(feedback_router, prefix="/api/v1")
 
-
-# ── Root redirect → UI ──
 @app.get("/", include_in_schema=False)
 async def root():
-    """Redirect root to the search UI."""
     return RedirectResponse(url="/static/index.html")
 
-
-# ── Health check ──
 @app.get("/api/health")
 async def health():
     return {
         "status": "ok",
-        "searcher_loaded": _searcher is not None,
+        "searcher_loaded": _global_state.get("faiss") is not None,
         "project_root": str(PROJECT_ROOT),
         "keyframes_available": keyframes_dir.exists(),
     }

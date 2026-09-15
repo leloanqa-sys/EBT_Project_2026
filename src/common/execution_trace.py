@@ -60,5 +60,6 @@ class TraceLogger:
             for op in trace.operator_traces:
                 print(f"  - {op.operator_name}({op.target}) [{op.status}]: {op.candidates_in} -> {op.candidates_out} ({op.latency_ms:.1f}ms)")
             print("===================================\n")
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to print trace summary: {e}")

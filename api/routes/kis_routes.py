@@ -10,8 +10,11 @@ import time
 import uuid
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import List, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -82,8 +85,9 @@ def get_video_metadata(video_id: str) -> dict:
         try:
             with open(meta_path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.error(f"[get_video_metadata] Error reading {meta_path}: {e}")
     return {}
 
 
@@ -116,126 +120,166 @@ def get_frame_image(video_id: str, frame_idx: int):
             )
             
     except Exception as e:
-        print(f"[API] Image resolver error: {e}")
-        pass
+        import logging, traceback
+        logging.error(f"[API] Image resolver error for {video_id} {frame_idx}: {e}")
+        logging.error(traceback.format_exc())
         
     raise HTTPException(status_code=404, detail="Frame image not found")
 
 
 
 def _run_real_search(query: str, query_type: str, top_k: int, question: Optional[str] = None) -> dict:
-    """Run the actual search pipeline using MVPPipeline."""
-    from src.pipeline import MVPPipeline
+    """Run the actual search pipeline using NLP Compiler, Hybrid Search and Lazy OCR."""
     import time
     import uuid
-    from api.main import _get_searcher
-
+    from src.database.db_manager import DatabaseManager
+    from src.database.legacy_detection_store import LegacyDetectionStore
+    from src.retrieval.hybrid_searcher import HybridSearcher
+    from src.retrieval.vector_index import FAISSIndex
+    from src.common.schemas import ScoringPlan
+    from src.nlp.gemini_parser import parse_query_to_ir
+    
     start_time = time.perf_counter()
-
-    # We only use searcher check to ensure fail-fast, but MVPPipeline will load it anyway
-    searcher = _get_searcher()
-    if searcher is None:
-        raise HTTPException(status_code=503, detail="VectorSearcher not loaded")
-
-    pipeline = MVPPipeline(detect_threshold=0.3, top_k_retrieve=500, searcher=searcher)
     query_id = f"api_{uuid.uuid4().hex[:8]}"
     
-    # Run pipeline
-    result = pipeline.run(query_id, query, query_type, question=question)
+    # 1. Compile Query with NLP
+    ir = parse_query_to_ir(query_id=query_id, raw_text=query, query_type=query_type)
+    
+    # 2. Initialize Data Layer & Hybrid Searcher
+    from api.main import get_db, get_faiss, get_detection_store
+    db = get_db()
+    faiss_index = get_faiss()
+    detection_store = get_detection_store()
+    retriever = HybridSearcher(db=db, faiss_index=faiss_index, detection_store=detection_store)
+    
+    # Extract scoring weights from environment or use defaults
+    visual_top_k = int(os.environ.get("SCORING_VISUAL_TOP_K", 2000))
+    w_visual = float(os.environ.get("SCORING_W_VISUAL", 1.0))
+    w_ocr = float(os.environ.get("SCORING_W_OCR", 0.5))
+    w_metadata = float(os.environ.get("SCORING_W_METADATA", 0.2))
+    w_object = float(os.environ.get("SCORING_W_OBJECT", 0.5))
+
+    scoring_plan = ScoringPlan(
+        visual_top_k=visual_top_k, 
+        w_visual=w_visual,
+        w_ocr=w_ocr,
+        w_metadata=w_metadata,
+        w_object=w_object
+    )
+    
+    # Apply dynamic routing based on Query Class (Exp D)
+    from src.retrieval.hybrid_searcher import route_scoring_plan
+    scoring_plan = route_scoring_plan(ir.query_class, scoring_plan)
+    
+    # 3. Retrieve Candidates (Hybrid Search + Lazy OCR on-the-fly)
+    raw_results = retriever.search(ir, scoring_plan=scoring_plan, top_k_final=top_k, enable_lazy_ocr=True)
     
     elapsed_ms = (time.perf_counter() - start_time) * 1000
 
-    # Read inferred query_type from IR Graph
-    inferred_type = query_type
-    if result.operator_trace and "ir_graph" in result.operator_trace:
-        inferred_type = result.operator_trace["ir_graph"].get("query_type", query_type)
+    if not raw_results:
+        return {"query_id": query_id, "query": query, "query_type": query_type, "total_results": 0, "search_time_ms": elapsed_ms, "parsed_info": {}, "results": []}
+        
+    # --- QA OCR-First Engine + VLM Temporal Predictor ---
+    # QA: Use OCR-first pipeline (SigLIP-guided frames → vote → VLM verify top-1)
+    # Temporal: VLMAuditor predicts [start, end] bounds for top candidate
+    qa_answer_global = None
+    try:
+        from src.retrieval.vlm_auditor import VLMAuditor
+        auditor = VLMAuditor(retriever.db)
+        top_cand = raw_results[0]
 
-    # Build response format
+        if query_type == "QA" and question:
+            try:
+                from src.retrieval.qa_ocr_engine import answer_question_ocr_first
+                qa_answer_global = answer_question_ocr_first(
+                    question=question,
+                    ranked_candidates=raw_results,  # already sorted by score DESC
+                    top_n_ocr=8,
+                )
+                # Stash on candidate for backward compat
+                top_cand.candidate.vqa_answer = qa_answer_global
+                print(f"[kis_routes] QA OCR-First answer: '{qa_answer_global}'")
+            except Exception as qa_e:
+                print(f"[kis_routes] QA OCR Engine failed, fallback to VLM: {qa_e}")
+                qa_answer_global = auditor.answer_question(question, top_cand)
+                top_cand.candidate.vqa_answer = qa_answer_global
+
+        vlm_start, vlm_end = auditor.predict_temporal_bounds(ir.raw_text, top_cand)
+
+        # Apply the VLM bounds to the top candidate
+        top_cand.candidate.pts_time = (vlm_start + vlm_end) / 2.0
+    except Exception as e:
+        print(f"[kis_routes] VLM Temporal Predictor failed: {e}")
+        vlm_start, vlm_end = None, None
+
     results = []
     
-    # Extract target objects from trace/ir
-    target_objs = []
-    if result.operator_trace and "ir_graph" in result.operator_trace:
-        ir = result.operator_trace["ir_graph"]
-        target_objs = [e.get("label", "") for e in ir.get("entities", [])]
-        
-    for c_obj in result.candidates:
+    for idx, cand in enumerate(raw_results[:top_k]):
         if len(results) >= top_k:
             break
             
-        rank = len(results) + 1
-        pts = c_obj.pts_time
+        rank = idx + 1
+        
+        # Determine actual sequence bounds from DP window or fallback to peak
+        if cand.temporal_evidence and cand.temporal_evidence.window:
+            start_pts = cand.temporal_evidence.window.start_time
+            end_pts = cand.temporal_evidence.window.end_time
+            # Ensure minimum 5-second window for UI aesthetics if the sequence was too fast
+            if end_pts - start_pts < 5.0:
+                mid = (start_pts + end_pts) / 2.0
+                start_pts = max(0.0, mid - 2.5)
+                end_pts = mid + 2.5
+        else:
+            start_pts = max(0.0, cand.candidate.pts_time - 2.5)
+            end_pts = cand.candidate.pts_time + 2.5
+            
+        pts = (start_pts + end_pts) / 2.0
         pts_str = f"{int(pts // 60):02d}:{int(pts % 60):02d}"
 
-        meta = get_video_metadata(c_obj.video_id)
-        watch_base = meta.get("watch_url", "")
-        v_title = meta.get("title", c_obj.video_id)
+        meta = db.get_video_metadata(cand.candidate.video_id) or {}
+        watch_base = meta.get("source", "")
+        v_title = meta.get("title", cand.candidate.video_id)
         sec_int = int(pts)
         watch_url = f"{watch_base}&t={sec_int}s" if watch_base else None
 
-        # Fetch labels from shared MetadataCache (reuse from executor, not new instance per request)
-        detected_labels = []
-        try:
-            db_meta = pipeline._executor.meta_cache.get_metadata(c_obj.video_id, c_obj.frame_idx)
-            if db_meta:
-                detected_labels = list(dict.fromkeys([d["class_entity"] for d in db_meta]))[:8]
-        except Exception:
-            pass
-
-        # Bug #2 Fix: DO NOT recalculate obj_score here.
-        # The pipeline executor already computed obj_score using the full synonyms_map + taxonomy_loader.
-        # Re-calculating with a simple string match would give inconsistent/wrong values.
-        obj_score = getattr(c_obj, 'obj_score', 0.0)
-        # Use the REAL fusion_score from the pipeline (includes Spatial & VQA logic)
-        fusion_score = c_obj.fusion_score
-        has_target_objects = len(target_objs) > 0
-
-        # Simulate TRAKE segments based on KIS frame
-        start_frame = None
-        end_frame = None
-        if inferred_type == "TRAKE":
-            start_frame = max(0, c_obj.frame_idx - 75)
-            end_frame = c_obj.frame_idx + 75
-
+        fps = cand.candidate.fps if hasattr(cand.candidate, 'fps') and cand.candidate.fps else 30.0
+        
         results.append({
             "rank": rank,
-            "video_id": c_obj.video_id,
-            "frame_idx": c_obj.frame_idx,
-            "siglip_score": round(c_obj.siglip_score, 4),
-            "obj_score": round(obj_score, 4),
-            "spatial_score": round(getattr(c_obj, 'spatial_score', 0.0), 4),
-            "fusion_score": round(fusion_score, 4),
-            "has_target_objects": has_target_objects,
+            "video_id": cand.candidate.video_id,
+            "frame_idx": cand.candidate.frame_idx,
+            "siglip_score": round(cand.score.visual, 4),
+            "obj_score": round(cand.score.object, 4),
+            "spatial_score": round(cand.score.metadata, 4),
+            "fusion_score": round(cand.score.final, 4),
+            "has_target_objects": len(ir.object_targets) > 0 and cand.score.object > 0,
             "pts_time": round(pts, 2),
             "timestamp": pts_str,
-            "frame_url": f"/api/v1/image/{c_obj.video_id}/{c_obj.frame_idx}",
+            "frame_url": f"/api/v1/image/{cand.candidate.video_id}/{cand.candidate.frame_idx}",
             "watch_url": watch_url,
             "video_title": v_title,
-            "detected_labels": detected_labels,
-            "vqa_answer": getattr(c_obj, 'vqa_answer', None),
-            "start_frame": start_frame,
-            "end_frame": end_frame,
+            "detected_labels": ir.object_targets,
+            "vqa_answer": getattr(cand.candidate, "vqa_answer", None),
+            "start_frame": max(0, int(start_pts * fps)) if query_type == "TRAKE" else None,
+            "end_frame": int(end_pts * fps) if query_type == "TRAKE" else None,
         })
-
-    # Prepare extracted info for UI based on trace (we didn't pass the raw IR graph back in MVP result yet, so mock it for UI)
-    extracted_objects = []
-    if result.operator_trace and "operator_traces" in result.operator_trace:
-         for op in result.operator_trace["operator_traces"]:
-             if op["operator_name"] == "DETECT":
-                 extracted_objects.append(op.get("details", {}).get("class", ""))
+    
+    # Pass parsed NLP info down to UI
+    parsed_info = {
+        "normalized_text": ir.raw_text,
+        "extracted_objects": [ir.dense_caption_en],
+        "sub_events": [t.term for t in ir.text_targets],
+    }
     
     return {
         "query_id": query_id,
         "query": query,
-        "query_type": inferred_type,
+        "query_type": query_type,
         "total_results": len(results),
         "search_time_ms": round(elapsed_ms, 1),
         "cache_hit": False,
-        "parsed_info": {
-            "normalized_text": query.lower(),
-            "extracted_objects": [obj for obj in extracted_objects if obj],
-            "sub_events": [],
-        },
+        "qa_answer": qa_answer_global,  # Top-level QA answer (QA mode only)
+        "parsed_info": parsed_info,
         "results": results,
     }
 

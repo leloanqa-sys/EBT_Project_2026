@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import glob
 import re
@@ -17,12 +17,8 @@ from src.role_a_retrieval.searcher import VectorSearcher
 from src.pipeline import MVPPipeline
 from src.role_c_logic.pipeline_trake import TRAKEPipeline
 
-# Direct known answers / semantic targets for specific cultural/factual QA queries
-QA_KNOWLEDGE_BASE = {
-    "query-p1-19-qa": "Hỏa hồng Nhật Tảo oanh thiên địa, Kiếm bạt Kiên Giang khóc quỷ thần",
-    "query-p1-15-qa": "Khánh Trung",
-    "query-p1-22-qa": "Chả giò thịt"
-}
+from src.role_c_logic.pipeline_qa import QAPipeline
+
 
 def parse_trake_subevents(content: str) -> Tuple[str, List[str]]:
     lines = [line.strip() for line in content.split('\n') if line.strip()]
@@ -30,7 +26,7 @@ def parse_trake_subevents(content: str) -> Tuple[str, List[str]]:
     events = []
     
     for line in lines:
-        m = re.match(r'^(?:E\d+|Sự kiện \d+|\d+\.)\s*:\s*(.+)$', line, re.IGNORECASE)
+        m = re.match(r'^(?:E\d+|Sự kiện \d+|\d+\.)\s*:?\s*(.+)$', line, re.IGNORECASE)
         if m:
             events.append(m.group(1).strip())
         else:

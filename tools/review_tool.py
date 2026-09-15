@@ -280,38 +280,51 @@ def get_remote_zip_urls(video_id: str) -> List[str]:
             matches.append(v)
     return matches
 
+_REMOTE_RZ_CACHE: Dict[str, Any] = {}
+_FAILED_REMOTE_URLS: Set[str] = set()
+
 def extract_single_file_from_remote_zip(video_id: str, fname: str) -> Optional[bytes]:
-    """Smart Extraction: Fetches ONLY the required image bytes via HTTP Range from remote ZIP."""
+    """Smart Extraction: Fetches ONLY the required image bytes via HTTP Range from remote ZIP with cached index."""
     urls = get_remote_zip_urls(video_id)
     if not urls: return None
     
-    target_suffix = f"{video_id}/{fname}"
+    target_suffix = f"{video_id}/{fname}".lower()
     try:
         import remotezip
         import requests
         from functools import partial
         session = requests.Session()
         session.verify = False
-        session.request = partial(session.request, timeout=10.0)
+        session.request = partial(session.request, timeout=15.0)
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
         for url in urls:
+            if url in _FAILED_REMOTE_URLS:
+                continue
             try:
-                with remotezip.RemoteZip(url, session=session) as rz:
-                    for inner_name in rz.namelist():
-                        if inner_name.endswith(target_suffix):
-                            print(f"  [RemoteZip] Streamed {inner_name} directly from {url}")
-                            return rz.read(inner_name)
+                if url not in _REMOTE_RZ_CACHE:
+                    rz = remotezip.RemoteZip(url, session=session)
+                    name_map = {name.lower(): name for name in rz.namelist()}
+                    _REMOTE_RZ_CACHE[url] = (rz, name_map)
+                
+                rz, name_map = _REMOTE_RZ_CACHE[url]
+                for k, inner_name in name_map.items():
+                    if k.endswith(target_suffix):
+                        print(f"  [RemoteZip] Streamed {inner_name} directly from {url}")
+                        return rz.read(inner_name)
             except Exception as e:
-                # 404 means the file doesn't exist in this specific zip, ignore and try next
+                print(f"[RemoteZip] Error streaming from {url}: {e}")
+                # _FAILED_REMOTE_URLS.add(url) # Do not blacklist the entire zip on a single timeout
                 continue
     except Exception as e:
-        print(f"  [RemoteZip] Global Error: {e}")
+        pass
     return None
+
 
 _ZIP_INDEX_CACHE: Dict[str, Dict[str, str]] = {}
 _DISCOVERED_ZIPS: Optional[List[str]] = None
+
 
 def map_frame_idx_to_keyframe_n(video_id: str, frame_idx: int, map_root: str = "data/raw/map-keyframes") -> Optional[int]:
     """Translates frame_idx to actual keyframe index n using map-keyframes CSV."""

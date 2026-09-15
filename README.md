@@ -1,148 +1,111 @@
-# 🎬 EBT Vision Search 2026 — AI Challenge System
+# EBT Project 2026 - Video Retrieval System (AI Challenge)
 
-Hệ thống truy xuất khoảnh khắc video đa phương thức (**Multimodal Video Information Retrieval**), trả lời câu hỏi thị giác (**Visual Q&A**) và truy vết chuỗi hành động (**Temporal TRAKE**) được phát triển cho cuộc thi **AI Challenge 2026**.
-
----
-
-## 🌟 Tính Năng Nổi Bật
-
-* ⚡ **Truy xuất Vector Siêu Tốc (FAISS + SigLIP2):** Tìm kiếm 177,321 khung hình trong < 10ms sử dụng mô hình Google SigLIP2 (768-dim).
-* 🧠 **Biên dịch Ngữ nghĩa Tự nhiên (Gemini NLP Engine):** Tự động bóc tách thực thể, quan hệ không gian, hành động và thuộc tính thành đồ thị `VisualIRGraph`.
-* 🔍 **Lọc Bounding Box & Quan hệ Không gian (SQLite Cache Engine):** Tra cứu 584 nhãn Faster R-CNN trong ~1.7ms/frame với cơ chế Soft Scoring.
-* 🖼️ **Trích xuất ảnh On-Demand (Multi-Strategy Image Resolver):** Hỗ trợ `remotezip` stream dữ liệu thẳng từ Cloud (HTTP Range) siêu tốc mà không cần tốn hàng trăm GB ổ cứng. Đọc trực tiếp ảnh từ file nén `.zip` hoặc trích xuất frame từ video `.mp4`.
-* 🤖 **Thẩm định Hình ảnh Chuyên sâu (Gemini VLM Re-ranking):** Tự động gửi các ứng viên khả nghi (ambiguous, điểm thấp) lên Gemini Vision API để xác nhận chéo, tăng độ chính xác mà không đòi hỏi GPU cục bộ.
-* 🎯 **Bộ Đánh giá Trực quan 3 Trạng thái (3-State Visual Audit Tool):** Chấm nhanh kết quả bằng phím tắt (`MATCH` ✅, `UNCERTAIN` ⚠️, `MISMATCH` ❌).
-* 🤖 **Tự động Tinh chỉnh Trọng số (ML Tuner):** Áp dụng thuật toán tối ưu hóa 3-Tier Ranking Loss tìm bộ tham số `(w_clip, w_obj, w_spatial)` tối ưu.
+Hệ thống truy xuất video lai (Hybrid Video Retrieval) tốc độ cao, được thiết kế để giải quyết bài toán tìm kiếm KIS (Known-Item Search) và TRAKE (Temporal Action Tracking) với nguồn tài nguyên phần cứng giới hạn (tối ưu cho máy 8GB RAM).
 
 ---
 
-## 🏗️ Kiến Trúc Hệ Thống (4-Role Architecture)
+## 1. Cấu trúc Thư mục & Luồng gọi (Directory Structure)
 
-```mermaid
-flowchart TD
-    UserQuery["Query Người Dùng (Tiếng Việt / English)"] --> RoleB["Role B: NLP Compiler (Gemini Flash API + Cache)"]
-    RoleB --> IRGraph["Visual IR Graph (Entities, Spatial, Actions)"]
-    
-    IRGraph --> RoleC_Plan["Role C: Deterministic Planner"]
-    RoleC_Plan --> RoleA["Role A: FAISS + SigLIP2 (Top-500 Retrieval)"]
-    
-    RoleA --> RoleC_Exec["Role C: Deterministic Executor (SQLite Metadata DB)"]
-    RoleC_Exec --> Scoring["Soft Scoring: (w_clip × CLIP + w_obj × OBJ + w_spatial × SPATIAL)"]
-    Scoring --> NMS["Soft Temporal NMS (Khử trùng lặp khung hình)"]
-    NMS --> Budget5["5-Budget Diversified Ranking"]
-    
-    Budget5 --> WebUI["Web Visualizer UI & API Gateway (FastAPI)"]
-    Budget5 --> AuditTool["Smart Visual Audit Tool (review_tool.py)"]
-    AuditTool --> GroundTruth["Ground Truth CSVs (outputs/verdicts/)"]
-    GroundTruth --> MLTuner["ML Tuner (Tối ưu hóa trọng số)"]
-```
-
----
-
-## 📁 Cấu Trúc Thư Mục
+Dự án được chia thành các module phân tán. Tầng API (Web) sẽ gọi xuống tầng Retrieval (Tìm kiếm), tầng Retrieval sẽ điều phối NLP (Xử lý ngôn ngữ) và Database.
 
 ```text
 EBT_Project_2026/
-├── api/                        # FastAPI Gateway & Web Visualizer
-│   ├── main.py                 # Server entrypoint & Static router
-│   ├── routes/
-│   │   ├── kis_routes.py       # POST /api/v1/search/kis
-│   │   ├── qa_routes.py        # POST /api/v1/search/qa
-│   │   ├── trake_routes.py     # POST /api/v1/search/trake
-│   │   └── feedback_routes.py  # POST /api/v1/feedback (Ground truth collector)
-│   └── static/                 # Giao diện Web Visualizer (HTML/CSS/JS)
-├── config/
-│   └── config.yaml             # Cấu hình tham số, đường dẫn và trọng số
-├── data/
-│   ├── raw/                    # Dữ liệu gốc (keyframes, objects, metadata)
-│   ├── processed/              # SQLite metadata.db & FAISS index
-│   └── zips/                   # Thư mục chứa file nén keyframes_Lxx.zip
-├── docs/                       # Tài liệu hướng dẫn & kỹ thuật
-│   ├── API_DOCUMENTATION.md    # Tài liệu toàn bộ REST API
-│   ├── USER_GUIDE.md           # Hướng dẫn vận hành và chấm bài
-│   └── ARCHITECTURE_HANDOVER.md# Bàn giao kỹ thuật & thiết kế chi tiết
-├── outputs/
-│   ├── reviews/                # File HTML sinh từ Visual Review Tool
-│   ├── verdicts/               # File CSV Ground Truth (human_verdict_*.csv)
-│   └── tuning_results.json     # Kết quả tối ưu từ ML Tuner
-├── src/
-│   ├── common/                 # Schemas (CandidateFrame, VisualIRGraph...)
-│   ├── role_a_retrieval/       # FAISS VectorSearcher & Feature Store
-│   ├── role_b_nlp/             # Gemini NLP Compiler & Normalizer
-│   └── role_c_logic/           # Capability Registry, Planner, Executor & Ranking
-├── tools/
-│   ├── review_tool.py          # Interactive Visual Audit & Web HTML Generator
-│   └── ml_tuner.py             # 3-Tier Loss ML Hyperparameter Tuner
-├── .env.example                # Khai báo mẫu biến môi trường
-├── requirements.txt            # Thư viện phụ thuộc
-└── README.md                   # Tài liệu tổng quan
+│
+├── api/                        # Tầng Giao tiếp (FastAPI Gateway)
+│   ├── main.py                 # Khởi tạo Global State (Database, FAISS) để tiết kiệm RAM.
+│   └── routes/                 # Tiếp nhận Request từ Web UI
+│       ├── kis_routes.py       # Xử lý tìm kiếm KIS, gọi HybridSearcher.
+│       └── trake_routes.py     # Xử lý tìm kiếm chuỗi sự kiện TRAKE.
+│
+├── src/                        # LÕI LOGIC HỆ THỐNG
+│   ├── common/                 # Dữ liệu dùng chung
+│   │   ├── schemas.py          # Single Source of Truth chứa `QueryIR`, `CandidateFrame`...
+│   │   └── config.py           # Cấu hình trọng số và tham số.
+│   │
+│   ├── nlp/                    # Tầng Xử lý Ngôn ngữ Tự nhiên
+│   │   └── gemini_parser.py    # Dịch câu hỏi Tiếng Việt -> JSON `QueryIR` (Bóc tách Visual, Text, Temporal).
+│   │
+│   ├── retrieval/              # Tầng Truy xuất & Chấm điểm (Trái tim hệ thống)
+│   │   ├── hybrid_searcher.py  # Thuật toán Late Fusion: Gộp điểm FAISS và SQLite. Gọi NLP và Database.
+│   │   ├── text_retriever.py   # Tìm kiếm bằng chữ (BM25) qua SQLite FTS5.
+│   │   ├── vector_index.py     # Quản lý FAISS Index (Search Vector).
+│   │   ├── vlm_auditor.py      # LLM Vision: Cắt Top 10 ảnh thật gửi Gemini Vision để chấm điểm lại.
+│   │   └── trake_formatter.py  # Thuật toán Dynamic Programming gộp chuỗi sự kiện TRAKE.
+│   │
+│   └── database/               # Tầng Giao tiếp Dữ liệu Đĩa
+│       ├── db_manager.py       # Kết nối SQLite (media.db, aic2026.db).
+│       └── legacy_detection_store.py # Kết nối metadata.db (2.2GB bouding boxes).
+│
+├── scripts/                    # Các script chạy độc lập để chuẩn bị dữ liệu (Data Ingestion)
+│   ├── 01_init_db.py           # Khởi tạo schema cho SQLite.
+│   ├── 02_ingest_all_data.py   # Nạp dữ liệu cơ bản.
+│   └── ...                     
+│
+└── data/                       # (Thư mục này không up lên Git)
+    ├── raw/keyframes/          # Chứa hàng trăm ngàn ảnh cắt từ video gốc.
+    └── processed/              # Chứa faiss index (.index) và SQLite (.db).
 ```
 
 ---
 
-## 🚀 Hướng Dẫn Cài Đặt & Chạy Hệ Thống
+## 2. Tổng quan Pipeline (Hệ thống hoạt động ra sao?)
 
-### 1. Cài đặt môi trường & Thư viện
-Yêu cầu **Python 3.10+**. Khởi tạo môi trường ảo và cài đặt thư viện:
-
-```powershell
-python -m venv venv
-.\venv\Scripts\activate
-pip install -r requirements.txt
-```
-*(Đã tích hợp thư viện `remotezip` để hỗ trợ stream dữ liệu qua mạng HTTP).*
-
-### 2. Cấu hình biến môi trường
-Sao chép `.env.example` thành `.env` và điền khóa API Gemini:
-```powershell
-copy .env.example .env
-```
-Nội dung `.env`:
-```env
-GEMINI_API_KEY="your_api_key_here"
-```
-
-### 3. Thiết lập Dữ liệu (Data Setup)
-Hệ thống sử dụng cơ chế **Smart On-Demand Data**:
-* Trọng lượng siêu nhẹ: Trọng tâm dữ liệu tập trung ở Database (`metadata.db`) và FAISS Index (chỉ vài trăm MB).
-* **Ảnh Video:** Bạn **KHÔNG BẮT BUỘC** phải tải hàng trăm GB file nén `Keyframes_Lxx.zip` về máy. Nếu máy không có file, hệ thống sẽ sử dụng `remotezip` để "hút" từng tấm ảnh từ Server BTC thông qua các đường link cấu hình trong file `spreadsheet_data.csv`.
-
-### 4. Khởi động Web Visualizer & API Server
-```powershell
-python -m uvicorn api.main:app --reload --reload-dir api --reload-dir src
-```
-* Mở trình duyệt: **[http://localhost:8000/](http://localhost:8000/)**
-* Tài liệu Swagger API: **[http://localhost:8000/docs](http://localhost:8000/docs)**
+1. **Nhận truy vấn:** Người dùng nhập Tiếng Việt (VD: *"người đàn ông áo đỏ lướt sóng"*). `kis_routes.py` tiếp nhận.
+2. **Phân rã NLP:** `gemini_parser.py` (Gemini 3.5 Flash) dịch sang tiếng Anh và chẻ thành các mảng: `dense_caption_en` (cho hình ảnh), `text_targets` (cho OCR/Phụ đề).
+3. **Tìm kiếm Phân tán (Scatter):** 
+   - `HybridSearcher` đưa tiếng Anh vào mô hình **SigLIP2** biến thành Vector, quét **FAISS** lấy Top 500 ID hình ảnh giống nhất.
+   - Quét **SQLite FTS5** bằng từ khóa để lấy các ID có chứa chữ.
+4. **Gom tụ (Gather & Late Fusion):** Gộp các ID lại. Dùng 1 lệnh SQL duy nhất kéo thông tin thời gian của toàn bộ ID. Chấm điểm chéo `Final = w_visual * SigLIP + w_ocr * Text`.
+5. **Giám khảo VLM (Optional):** Gửi 10 ảnh tốt nhất cho Gemini Vision nhìn lại lần cuối để Rerank.
+6. **Xếp chuỗi (TRAKE):** Nếu là câu hỏi chuỗi, chạy Quy hoạch động (DP) để nối các frame theo đúng thứ tự thời gian.
+7. **Trả kết quả:** Chuyển thành JSON gửi về UI.
 
 ---
 
-## 🎮 Hướng Dẫn Sử Dụng Công Cụ
+## 3. Đánh giá Hiện trạng (Status & Limitations)
 
-### 1. Tự tạo Query và Chấm bài trực quan (`tools/review_tool.py`)
-```powershell
-python tools/review_tool.py --query "a person driving a red car" --id Q001
-```
-* **Thao tác phím tắt:**
-  * <kbd>1</kbd> / <kbd>Y</kbd>: `MATCH` (✅ Khớp - Viền xanh lá)
-  * <kbd>2</kbd> / <kbd>U</kbd>: `UNCERTAIN` (⚠️ Không chắc chắn - Viền vàng)
-  * <kbd>0</kbd> / <kbd>N</kbd>: `MISMATCH` (❌ Sai - Viền đỏ)
-  * <kbd>J</kbd> / <kbd>K</kbd>: Chuyển thẻ tiếp theo / Lùi lại
-  * <kbd>Ctrl + S</kbd>: Tải file CSV kết quả về máy và lưu vào `outputs/verdicts/`.
+### 🟢 Những gì Đã Chạy Ổn Định (Stable)
+*   **Kiến trúc DI (Dependency Injection):** RAM được tối ưu triệt để. Database và FAISS chỉ load 1 lần lúc bật server, xử lý Request cực nhanh, phù hợp cho cấu hình 8GB RAM.
+*   **Luồng Visual (SigLIP2 + FAISS):** Chạy cực kỳ chính xác. Đã mở khóa tính năng dịch Tiếng Anh tự động từ Gemini để SigLIP hiểu đúng context hơn là dùng Tiếng Việt.
+*   **Luồng TRAKE (Thuật toán DP):** Hoạt động hoàn hảo trong việc khâu nối các sự kiện rời rạc thành dòng thời gian liên tục mà không cần Model Video nặng nề.
 
-> ⚠️ **LƯU Ý QUAN TRỌNG KHI REVIEW (GROUND TRUTH):**
-> * **Kiểm tra chất lượng Query:** Đảm bảo rằng query (câu lệnh tìm kiếm) là hoàn toàn hợp lệ và cảnh vật/hành động đó thực sự CÓ TỒN TẠI trong tập dữ liệu. Nếu bạn nhập một truy vấn không tưởng (không có trong data), hệ thống sẽ trả về toàn bộ là kết quả Rác.
-> * Việc chấm điểm trên một query vô nghĩa sẽ làm hỏng dữ liệu huấn luyện, khiến **ML Tuner** bị sai lệch vĩnh viễn.
-
-### 2. Tự động Tối ưu Trọng số Fusion (`tools/ml_tuner.py`)
-Sau khi chấm chuẩn từ 5 - 15 câu truy vấn có thật:
-```powershell
-python tools/ml_tuner.py
-```
-Hệ thống sẽ tính toán độ phạt Loss và lưu cấu hình tối ưu `(w_clip, w_obj, w_spatial)` vào `outputs/tuning_results.json`.
+### 🟡 Những Giới Hạn Cần Cải Thiện (Limitations / WIP)
+*   **Database OCR Đang Trống:** Bảng `text_segments` trong `aic2026.db` hiện có 0 dòng do chưa từng chạy script Ingest OCR cho full dataset. Luồng tìm kiếm bằng chữ tạm thời vô tác dụng.
+*   **Dữ liệu Vật thể (20M boxes) Bị Bỏ Xó:** Hệ thống nạp file `metadata.db` 2.2GB nhưng `w_object` đang khóa ở `0.0` do nhãn bị nhiễu. **Hướng giải quyết tới:** Dùng nó làm "Điểm Thưởng" (Bonus Score) cho các truy vấn đếm số lượng ("2 chiếc xe") hoặc không gian ("bên trái").
+*   **Mù chuyển động (Motion Blindness):** Do quét ảnh tĩnh, SigLIP dễ bắt nhầm các frame lỗi. Cần bổ sung thuật toán Làm mượt theo thời gian (Temporal Smoothing / Sliding Window 3s) ở `HybridSearcher`.
 
 ---
 
-## 📚 Tài Liệu Kèm Theo
-* 📖 [Tài liệu Hướng dẫn Vận hành (USER_GUIDE.md)](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/USER_GUIDE.md)
-* 📡 [Tài liệu Chi tiết REST API (API_DOCUMENTATION.md)](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/API_DOCUMENTATION.md)
-* 🏛️ [Kiến trúc Kỹ thuật (ARCHITECTURE_HANDOVER.md)](file:///c:/Users/Admin/Downloads/EBT_Project_2026/docs/ARCHITECTURE_HANDOVER.md)
+## 4. Hướng dẫn Setup Data
+
+Hệ thống yêu cầu cấu trúc thư mục `data/` như sau (không đẩy lên Git):
+```text
+data/
+├── raw/
+│   └── keyframes/              # Chứa các thư mục video (L01_V001/0001.jpg)
+└── processed/
+    ├── aic2026.db              # DB chứa OCR/ASR (Cần chạy scripts 06, 07 để tạo)
+    ├── media.db                # DB chứa map frame_id, video_id, pts_time (Cần chạy scripts 01, 02)
+    ├── metadata.db             # DB chứa 20M object bounding boxes
+    └── faiss/
+        └── siglip2.index       # File index FAISS đã huấn luyện
+```
+*Lưu ý: Chạy lần lượt các file trong thư mục `scripts/` (01 đến 07) để build lại Database nếu bạn tải về bộ data trắng.*
+
+---
+
+## 5. Hướng dẫn Chạy (Run Instructions)
+
+1. Cài đặt thư viện:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Cấu hình Môi trường:
+   - Tạo file `.env` (copy từ `.env.example`).
+   - Điền API Key của Google Gemini vào.
+3. Chạy Server FastAPI:
+   ```bash
+   # Khởi động server ở port 8000
+   uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+4. Truy cập giao diện Web tĩnh tại: `http://localhost:8000/static/index.html` (Hoặc mở gốc `http://localhost:8000/`)

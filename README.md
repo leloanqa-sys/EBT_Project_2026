@@ -51,7 +51,7 @@ EBT_Project_2026/
 ## 2. Tổng quan Pipeline (Hệ thống hoạt động ra sao?)
 
 1. **Nhận truy vấn:** Người dùng nhập Tiếng Việt (VD: *"người đàn ông áo đỏ lướt sóng"*). `kis_routes.py` tiếp nhận.
-2. **Phân rã NLP:** `gemini_parser.py` (Gemini 3.5 Flash) dịch sang tiếng Anh và chẻ thành các mảng: `dense_caption_en` (cho hình ảnh), `text_targets` (cho OCR/Phụ đề).
+2. **Phân rã NLP:** `gemini_parser.py` (Gemini 3.5 Flash lite) dịch sang tiếng Anh và chẻ thành các mảng: `dense_caption_en` (cho hình ảnh), `text_targets` (cho OCR/Phụ đề).
 3. **Tìm kiếm Phân tán (Scatter):** 
    - `HybridSearcher` đưa tiếng Anh vào mô hình **SigLIP2** biến thành Vector, quét **FAISS** lấy Top 500 ID hình ảnh giống nhất.
    - Quét **SQLite FTS5** bằng từ khóa để lấy các ID có chứa chữ.

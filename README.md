@@ -1,4 +1,4 @@
-# EBT Project 2026 - Video Retrieval System (AI Challenge)
+# EBT Project 2026 - Video Retrieval System (AI Challenge 2026)
 
 Hệ thống truy xuất video lai (Hybrid Video Retrieval) tốc độ cao, được thiết kế để giải quyết bài toán tìm kiếm KIS (Known-Item Search) và TRAKE (Temporal Action Tracking) với nguồn tài nguyên phần cứng giới hạn (tối ưu cho máy 8GB RAM).
 
